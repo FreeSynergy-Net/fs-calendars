@@ -1,0 +1,17 @@
+[package]
+name = "fs-calendar-testdata"
+description = "Test providers and the fixed sample data for FreeSynergy calendar: a fake, an empty, a failing and a slow implementation of the Appointments trait (draft, pilot programm-grundgeruest)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+chrono-tz = "0.10"
+tokio = { version = "1", features = ["time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }

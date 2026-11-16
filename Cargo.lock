@@ -1608,6 +1608,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs-calendar-testdata"
+version = "0.0.4"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "chrono-tz",
+ "tokio",
+]
+
+[[package]]
 name = "fs-components-app"
 version = "0.0.2"
 source = "git+https://github.com/FreeSynergy/fs-components?rev=9950b51#9950b5136d70156dbd6b947e33d773c4b1e80676"
