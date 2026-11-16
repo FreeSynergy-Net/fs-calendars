@@ -5,20 +5,22 @@
 //! computed (`rev = rev_at_import`), never stored (ADR 0085).
 
 use fs_calendar_testdata::draft::{
-    BasicValue, FileRef, LocalDateTime, MediaType, ObjectId, Origin, OriginChannel, Reference,
-    Result, Revision, Utc,
+    FileRef, LocalDateTime, MediaType, ObjectId, Origin, OriginChannel, Reference, Result,
+    Revision, Utc,
 };
-use sha2::{Digest, Sha256};
-use turso::Value;
+use fs_objects::v5::original as layer;
+use fs_types as ft;
 
+use crate::bridge::{adapt, oid, reference, rev};
+use crate::bridge_values::local;
 use crate::codec::{
-    get_int, get_opt_int, get_opt_text, get_text, id_value, int, int_to_local, local_to_int,
-    opt_int, opt_text, reference_of, text,
+    get_int, get_opt_int, get_opt_text, get_text, id_value, int_to_local, reference_of, text,
 };
+use crate::registry::DOMAIN;
 use crate::series_tables::UNREAD;
 use crate::store::Conn;
 use crate::words::{from_word, word};
-use fs_objects::v5::tables_more::{OBJECT_ORIGIN, OBJECT_ORIGINAL};
+use fs_objects::v5::tables_more::OBJECT_ORIGIN;
 
 const CHANNELS: [(OriginChannel, &str); 7] = [
     (OriginChannel::File, "file"),
@@ -45,32 +47,10 @@ pub struct NewOrigin {
     pub original: Option<(Vec<u8>, MediaType)>,
 }
 
-/// Lower-case hex SHA-256 of bytes.
-#[must_use]
-pub fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect::<Vec<_>>()
-        .concat()
-}
+pub use fs_objects::v5::original::{hex32, original_iri, sha256_hex};
 
-/// Lower-case hex of 32 bytes.
-#[must_use]
-pub fn hex32(b: &[u8; 32]) -> String {
-    b.iter()
-        .map(|x| format!("{x:02x}"))
-        .collect::<Vec<_>>()
-        .concat()
-}
-
-/// The `urn:sha256:<hex>` IRI of a kept original.
-#[must_use]
-pub fn original_iri(hex: &str) -> String {
-    format!("urn:sha256:{hex}")
-}
-
-/// Write the origin row and the original; `rev_at_import` is the revision the object has when the import is done.
+/// Write the origin row and the original (the layer's `record`, with the trait's types); `rev_at_import` is the
+/// revision the object has when the import is done.
 ///
 /// # Errors
 /// `Invalid` naming `table.column`, or the engine's error.
@@ -81,46 +61,21 @@ pub async fn record(
     rev_at_import: Revision,
     now: i64,
 ) -> Result<()> {
-    let kept = o.original.as_ref().map(|(b, m)| (sha256_hex(b), m));
-    if let Some((bytes, media)) = &o.original {
-        let hex = sha256_hex(bytes);
-        c.insert(
-            &OBJECT_ORIGINAL,
-            vec![
-                id_value(id),
-                text(&media.0),
-                Value::Blob(bytes.clone()),
-                text(&hex),
-                int(now),
-                Value::Null,
-            ],
-        )
-        .await?;
-    }
-    let (iri, hex, media) = match &kept {
-        Some((h, m)) => (opt_text(Some(&original_iri(h))), text(h), text(&m.0)),
-        None => (Value::Null, Value::Null, Value::Null),
+    let media = |m: &MediaType| ft::MediaType(m.0.clone());
+    let ours = layer::NewOrigin {
+        channel: word(&CHANNELS, o.channel).to_owned(),
+        source: reference(&o.source)?,
+        media_type: media(&o.media_type),
+        foreign_uid: o.foreign_uid.clone(),
+        foreign_recurrence_id: o.foreign_recurrence_id.map(local).transpose()?,
+        foreign_etag: o.foreign_etag.clone(),
+        prod_id: o.prod_id.clone(),
+        importer: o.importer.clone(),
+        original: o.original.as_ref().map(|(b, m)| (b.clone(), media(m))),
     };
-    c.insert(
-        &OBJECT_ORIGIN,
-        vec![
-            id_value(id),
-            text(word(&CHANNELS, o.channel)),
-            text(&o.source.canonical()),
-            text(&o.media_type.0),
-            text(&o.foreign_uid),
-            opt_int(o.foreign_recurrence_id.map(local_to_int).transpose()?),
-            opt_text(o.foreign_etag.as_deref()),
-            opt_text(o.prod_id.as_deref()),
-            int(now),
-            text(&o.importer),
-            int(i64::try_from(rev_at_import.0).unwrap_or(0)),
-            iri,
-            hex,
-            media,
-        ],
-    )
-    .await
+    layer::record(c.inner(), &DOMAIN, oid(id), &ours, rev(rev_at_import), now)
+        .await
+        .map_err(adapt)
 }
 
 /// The origin of an object, `None` when it was not imported.
@@ -185,17 +140,10 @@ fn from_hex(hex: &str) -> Result<[u8; 32]> {
 /// # Errors
 /// `Unavailable` for a row that does not read back.
 pub async fn original_of(c: &Conn<'_>, id: ObjectId) -> Result<Option<(Vec<u8>, MediaType)>> {
-    let rows = c
-        .query(
-            "SELECT bytes, media_type FROM object_original WHERE object = ?",
-            vec![id_value(id)],
-        )
-        .await?;
-    match rows.first().map(|r| (r.first().cloned(), get_text(r, 1))) {
-        Some((Some(Value::Blob(b)), m)) => Ok(Some((b, MediaType(m?)))),
-        Some(_) => Err(crate::codec::damaged("original")),
-        None => Ok(None),
-    }
+    Ok(layer::original_of(c.inner(), oid(id))
+        .await
+        .map_err(adapt)?
+        .map(|(b, m)| (b, MediaType(m.0))))
 }
 
 /// Mark a part this program cannot interpret (the part stays in the original).

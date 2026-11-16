@@ -27,7 +27,11 @@ fn date_back(v: ft::Date) -> si::Result<si::Date> {
     si::Date::parse(&v.canonical()).map_err(|_| bad("date"))
 }
 
-fn local(v: si::LocalDateTime) -> si::Result<ft::LocalDateTime> {
+/// A wall-clock time of the trait as the layer's.
+///
+/// # Errors
+/// `Invalid` for a value `fs-types` refuses.
+pub fn local(v: si::LocalDateTime) -> si::Result<ft::LocalDateTime> {
     ft::LocalDateTime::new(date(v.date())?, v.hour(), v.minute(), v.second())
         .map_err(|_| bad("time"))
 }
