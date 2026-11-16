@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=FreeSynergy.Calendars
+Comment=Plan dates and calendars
+Exec=fs-calendars
+Icon=net.freesynergy.Calendars
+Terminal=false
+Categories=Office;Calendar;
