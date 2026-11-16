@@ -132,6 +132,13 @@ async fn write_exception(
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     if existing.is_none() {
         insert(c, eid, "EventException", &m.title, actor, now).await?;
+    } else {
+        // The envelope follows the row (an old title must not stay in `objects.name`); same id, no `DELETE`.
+        c.exec(
+            "UPDATE objects SET name = ?, name_sort = ? WHERE id = ?",
+            vec![text(&m.title), text(&m.title.to_lowercase()), id_value(eid)],
+        )
+        .await?;
     }
     write_row(
         c,
@@ -259,38 +266,4 @@ pub async fn remove_exception(c: &Conn<'_>, master: ObjectId, rid: LocalDateTime
             .await?;
     }
     Ok(())
-}
-
-/// Hide the exceptions at or after `at` (a cut took their occurrences away).
-///
-/// # Errors
-/// The engine's error.
-pub async fn hide(c: &Conn<'_>, master: ObjectId, at: i64) -> Result<()> {
-    c.exec("UPDATE calendar_appointment SET hidden_by = ? WHERE master = ? AND recurrence_id >= ? AND hidden_by IS NULL", vec![int(at), id_value(master), int(at)]).await.map(|_| ())
-}
-
-/// Show the exceptions that the cut at `at` hid.
-///
-/// # Errors
-/// The engine's error.
-pub async fn unhide(c: &Conn<'_>, master: ObjectId, at: i64) -> Result<()> {
-    c.exec(
-        "UPDATE calendar_appointment SET hidden_by = NULL WHERE master = ? AND hidden_by = ?",
-        vec![id_value(master), int(at)],
-    )
-    .await
-    .map(|_| ())
-}
-
-/// Give the visible exceptions at or after `at` to the tail series (the split of "this and the following").
-///
-/// # Errors
-/// The engine's error.
-pub async fn move_to_tail(
-    c: &Conn<'_>,
-    head_id: ObjectId,
-    tail: &Appointment,
-    at: i64,
-) -> Result<()> {
-    c.exec("UPDATE calendar_appointment SET master = ?, uid = ? WHERE master = ? AND recurrence_id >= ? AND hidden_by IS NULL", vec![id_value(tail.id), text(&tail.uid), id_value(head_id), int(at)]).await.map(|_| ())
 }

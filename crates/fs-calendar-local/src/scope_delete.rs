@@ -16,7 +16,8 @@ use crate::cuts::{save_cut, take_cut};
 use crate::envelope::{bump, log, trash, trash_days};
 use crate::read::load;
 use crate::scope_ops::live;
-use crate::series::{hide, put_exception, unexclude, unhide};
+use crate::series::{put_exception, unexclude};
+use crate::series_hide::{hide, unhide};
 use crate::store::Conn;
 use crate::write::write_appointment;
 

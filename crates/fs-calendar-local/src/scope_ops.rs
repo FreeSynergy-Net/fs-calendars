@@ -20,7 +20,8 @@ use crate::codec::{id_text, naive_secs};
 use crate::envelope::{bump, insert, log};
 use crate::fields::{Flat, diff, flatten};
 use crate::read::{Loaded, load};
-use crate::series::{move_to_tail, put_exception};
+use crate::series::put_exception;
+use crate::series_hide::move_to_tail;
 use crate::store::Conn;
 use crate::write::{validate, write_appointment};
 

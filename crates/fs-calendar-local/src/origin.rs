@@ -229,12 +229,13 @@ pub async fn refuse_rule_edit(
     id: ObjectId,
     p: &fs_calendar_testdata::draft::AppointmentPatch,
 ) -> Result<()> {
-    if (p.recurrence.is_some() || p.excluded_recurrence.is_some())
+    // The start is part of it: the kept `EXDATE` and exceptions point at the old times.
+    if (p.recurrence.is_some() || p.excluded_recurrence.is_some() || p.when.is_some())
         && !read_unread(c, id).await?.is_empty()
     {
         return Err(fs_calendar_testdata::draft::Error::Unsupported {
             capability: "event.update".to_owned(),
-            reason: "the rule of this series is kept as written and cannot be edited here (Serie nur teilweise darstellbar)".to_owned(),
+            reason: "the rule and the start of this series are kept as written and cannot be edited here (Serie nur teilweise darstellbar)".to_owned(),
         });
     }
     Ok(())

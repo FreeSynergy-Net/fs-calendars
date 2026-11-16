@@ -5,7 +5,7 @@
 
 use fs_calendar_testdata::draft::{LocalDateTime, ObjectId, PersonRef, Result};
 
-use crate::codec::{get_id, get_int, id_value, int};
+use crate::codec::{get_id, get_int, id_value, int, text};
 use crate::read::load;
 use crate::series::scrub_exception;
 use crate::store::Conn;
@@ -84,5 +84,21 @@ async fn scrub(
     };
     let rid: LocalDateTime = crate::codec::int_to_local(at)?;
     scrub_exception(c, &m.appt, rid, actor, now).await?;
+    redact_log(c, master, rid).await?;
     Ok(1)
+}
+
+/// The log of the master names the changed fields of that occurrence (`override.*` with the occurrence as row key). They
+/// go with the scrub: the changes are removed and their entries are marked `redacted` (as v4 marks a purged entry).
+async fn redact_log(c: &Conn<'_>, master: ObjectId, rid: LocalDateTime) -> Result<()> {
+    let key = text(&fs_calendar_testdata::draft::BasicValue::canonical(&rid));
+    let hit = "SELECT activity FROM activity_change WHERE row_key = ? AND field LIKE 'override.%' AND activity IN (SELECT id FROM activity WHERE object = ?)";
+    let params = vec![key, id_value(master)];
+    c.exec(
+        &format!("UPDATE activity SET redacted = 1, explained = 0 WHERE id IN ({hit})"),
+        params.clone(),
+    )
+    .await?;
+    c.exec("DELETE FROM activity_change WHERE row_key = ? AND field LIKE 'override.%' AND activity IN (SELECT id FROM activity WHERE object = ?)", params).await?;
+    Ok(())
 }

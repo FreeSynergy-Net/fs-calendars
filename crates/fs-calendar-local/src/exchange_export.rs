@@ -13,7 +13,9 @@ use crate::jscal_out::RECURRENCE_KEYS;
 use crate::provider_admin::ExportSource;
 
 /// The members of the received event that this program does not store.
-const ONLY_IN_ORIGINAL: [&str; 5] = [
+const ONLY_IN_ORIGINAL: [&str; 7] = [
+    "relatedTo",
+    "organizerCalendarAddress",
     "locations",
     "virtualLocations",
     "links",
@@ -72,5 +74,16 @@ pub fn only_in_original(src: &ExportSource) -> Vec<Loss> {
             field: (*k).to_owned(),
             reason: "only in the received original, not stored: not written".into(),
         })
+        .chain(
+            ev.get("sequence")
+                .and_then(Value::as_u64)
+                .filter(|n| *n > 0)
+                .map(|_| Loss {
+                    uid: Some(src.appointment.uid.clone()),
+                    field: "sequence".into(),
+                    reason: "the sequence of the received file is not taken over (counted anew)"
+                        .into(),
+                }),
+        )
         .collect()
 }

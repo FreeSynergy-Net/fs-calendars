@@ -215,6 +215,15 @@ impl Exchange for LocalExchange {
             .map(|(s, people)| {
                 let kept = crate::exchange_export::kept_recurrence(s);
                 lost.extend(crate::exchange_export::only_in_original(s));
+                if kept.is_none() && s.unread.iter().any(|f| f == "recurrence") {
+                    lost.push(fs_calendar_testdata::draft::Loss {
+                        uid: Some(s.appointment.uid.clone()),
+                        field: "recurrence".into(),
+                        reason:
+                            "the received original is gone: the series is written without its rule"
+                                .into(),
+                    });
+                }
                 event_json(&s.appointment, people, kept.as_ref(), &mut lost)
             })
             .collect();

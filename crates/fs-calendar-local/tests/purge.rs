@@ -230,3 +230,47 @@ async fn the_period_run_removes_the_fields_of_a_deleted_changed_occurrence() {
     );
     assert_eq!(f.p.get(a.id).await.unwrap().unwrap().overrides.len(), 1);
 }
+
+#[tokio::test]
+async fn the_period_run_leaves_no_trace_of_the_changed_title_in_the_envelope_or_the_log() {
+    use common::series::{this, title, weekly};
+    let f = fx().await;
+    let a = weekly(&f).await;
+    let u =
+        f.p.update(a.id, a.revision, title("Geheim"), this(9))
+            .await
+            .unwrap();
+    let d = f.p.delete(a.id, u.revision, this(9)).await.unwrap();
+    let name = "SELECT name || '|' || name_sort FROM objects WHERE type = 'EventException'";
+    assert_eq!(
+        f.rows(name).await,
+        [[turso::Value::Text("Geheim|geheim".into())]],
+        "before the run the envelope still names the change (restore needs it)"
+    );
+    f.set_now(d.restorable_until.unwrap().millis());
+    f.p.sweep_expired().await.unwrap();
+    assert_eq!(
+        f.rows(name).await,
+        [[turso::Value::Text("Montag|montag".into())]],
+        "the envelope follows the scrub"
+    );
+    assert_eq!(
+        f.count("activity_change WHERE new_text = 'Geheim' OR old_text = 'Geheim'")
+            .await,
+        0,
+        "the log of the master no longer holds the value"
+    );
+    let red = f
+        .rows("SELECT count(*) FROM activity WHERE redacted = 1")
+        .await;
+    assert_eq!(
+        red[0][0],
+        turso::Value::Integer(1),
+        "the entry that named the change is marked redacted"
+    );
+    assert_eq!(
+        f.p.history(a.id, None, 20).await.unwrap().items.len(),
+        3,
+        "the history itself stays: create, update, delete"
+    );
+}

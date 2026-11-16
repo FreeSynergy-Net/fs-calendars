@@ -86,3 +86,47 @@ async fn a_file_is_read_only_with_the_checksum_it_was_promised() {
         "a wrong checksum is refused"
     );
 }
+
+#[tokio::test]
+async fn the_start_of_a_series_that_is_not_read_cannot_be_moved_and_an_edited_export_names_what_it_leaves()
+ {
+    use common::exchange::{export_text, fixture};
+    use fs_calendar_testdata::draft::{AppointmentPatch, Appointments, SeriesScope};
+    use fs_calendar_testdata::sample::{at, timed};
+    let e = ex().await;
+    let r = import_text(&e, &fixture("yearday_series.ics"), ICS_TYPE).await;
+    let a = e.local.get(r.created[0]).await.unwrap().unwrap();
+    let mv = AppointmentPatch {
+        when: Some(timed(at(2027, 1, 2, 9, 0), "Europe/Berlin", 60)),
+        ..Default::default()
+    };
+    let u = e
+        .local
+        .update(a.id, a.revision, mv, SeriesScope::Whole)
+        .await;
+    assert!(
+        matches!(u, Err(Error::Unsupported { .. })),
+        "the kept EXDATE and exceptions point at the old start: {u:?}"
+    );
+    let g = import_text(&e, &fixture("google.ics"), ICS_TYPE).await;
+    let id = g.created[0];
+    let ga = e.local.get(id).await.unwrap().unwrap();
+    e.local
+        .update(
+            id,
+            ga.revision,
+            AppointmentPatch {
+                title: Some("Neu".into()),
+                ..Default::default()
+            },
+            SeriesScope::Whole,
+        )
+        .await
+        .unwrap();
+    let (_, lost) = export_text(&e, &[id], ICS_TYPE).await;
+    let fields: Vec<&str> = lost.iter().map(|l| l.field.as_str()).collect();
+    assert!(
+        fields.contains(&"sequence") && fields.contains(&"organizerCalendarAddress"),
+        "{fields:?}"
+    );
+}

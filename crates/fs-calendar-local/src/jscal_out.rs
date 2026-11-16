@@ -226,21 +226,15 @@ pub fn event_json(
     if a.use_default_alerts {
         o.insert("useDefaultAlerts".into(), json!(true));
     }
-    match (None::<Value>, a.recurrence.as_slice()) {
-        (Some(raw), _) => {
-            o.insert("recurrenceRule".into(), raw);
+    if let [first, rest @ ..] = a.recurrence.as_slice() {
+        o.insert("recurrenceRule".into(), rule_to_json(first));
+        if !rest.is_empty() {
+            losses.push(Loss {
+                uid: Some(a.uid.clone()),
+                field: "recurrence".into(),
+                reason: format!("{} further rule(s): JSCalendar 2.0 allows one", rest.len()),
+            });
         }
-        (None, [first, rest @ ..]) => {
-            o.insert("recurrenceRule".into(), rule_to_json(first));
-            if !rest.is_empty() {
-                losses.push(Loss {
-                    uid: Some(a.uid.clone()),
-                    field: "recurrence".into(),
-                    reason: format!("{} further rule(s): JSCalendar 2.0 allows one", rest.len()),
-                });
-            }
-        }
-        (None, []) => {}
     }
     if !a.excluded_recurrence.is_empty() {
         losses.push(Loss {

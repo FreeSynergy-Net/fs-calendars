@@ -44,6 +44,7 @@ pub mod rules;
 pub mod scope_delete;
 pub mod scope_ops;
 pub mod series;
+pub mod series_hide;
 pub mod series_tables;
 pub mod spec;
 pub mod store;
