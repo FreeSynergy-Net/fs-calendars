@@ -39,9 +39,13 @@ pub trait Appointments: Send + Sync {
     /// (`CalendarInfo.trash`; `Only` = Papierkorb-Ansicht).
     async fn calendars(&self, trash: Trash) -> Result<Vec<CalendarInfo>>;
     /// `calendar.create`: eigener Kalender (`CalendarSource::Own`). `owner = None`: die fragende Person; sonst eine
-    /// Person, Gruppe oder Organisation, für die sie das Recht hat (fs-access, sonst `Forbidden`); KI/`Profile`: `Invalid`.
+    /// Person, Gruppe oder Organisation, für die sie das Recht hat (fs-access, sonst `Forbidden`); KI als Eigentümerin:
+    /// `Forbidden { calendar.create }` (wie `tasks_v1`), `Profile`: `Invalid`.
     async fn create_calendar(&self, name: &str, color: Option<&str>, default_zone: Option<Zone>, owner: Option<PersonRef>) -> Result<CalendarInfo>;
     /// `calendar.update`: Name, Farbe, Vorgabe-Zone, Eigentümer, bei einem Abo Adresse und Abrufregel; Vergleich-und-Setzen.
+    ///
+    /// Kalender im Papierkorb (gilt für `update_calendar`, `delete_calendar`, `refresh_calendar`): `NotFound(id)`, wie
+    /// eine gelöschte Liste in `tasks_v1`; nichts geändert, kein Abruf. Nur `restore_calendar` und `purge` erreichen ihn.
     async fn update_calendar(&self, id: ObjectId, expected: Revision, change: CalendarPatch) -> Result<CalendarInfo>;
     /// `calendar.delete`: Kalender samt seinen Terminen in den Papierkorb (eine Frist für alle, Verlauf geht mit). Auch
     /// der letzte eigene Kalender (das Programm legt sofort einen neuen an).
@@ -75,7 +79,8 @@ pub trait Appointments: Send + Sync {
 
     /// `event.create`: prüfen und speichern. Abgelehnt, wenn die `uid` schon existiert; `ReadOnly` in einem Abo.
     /// Für ALLE schreibenden Termin-Methoden (create, update, delete, invite, respond) gilt: liegt der Kalender im
-    /// Papierkorb, ist es `Invalid` am Feld `calendar`, nichts wird geschrieben.
+    /// Papierkorb, ist es `NotFound(<Kalender-Id>)` (wie neue Aufgaben in einer gelöschten Liste, `tasks_v1`), nichts
+    /// wird geschrieben; `restore` eines Termins darin ist `Invalid` am Feld `calendar` (siehe dort).
     async fn create(&self, draft: AppointmentDraft) -> Result<Appointment>;
     /// `event.update`, Vergleich-und-Setzen gegen `expected`; `scope` bei Serien (sonst `Whole`).
     /// Verschieben (A8), Erinnerung (A6), Zone (A7), ganztägig (A3) sind Felder dieser Änderung.
@@ -104,6 +109,11 @@ pub trait Appointments: Send + Sync {
     async fn respond(&self, id: ObjectId, expected: Revision, who: &PersonRef, answer: Answer, comment: Option<&str>, proposal: Option<When>, scope: SeriesScope) -> Result<Appointment>;
     /// `event.freebusy`: Verfügbarkeit von Teilnehmern (Personen, Räume, Ressourcen) im Fenster, je Teilnehmer genau
     /// ein Eintrag in der Reihenfolge von `who`: belegt (ohne Titel), nicht freigegeben oder unbekannt, nie geraten.
+    /// Die Freigabe ist eine Einstellung der Person gegenüber der FRAGENDEN Person (fs-access), nie je Umfrage; ohne
+    /// Freigabe immer `NotShared`, gleich ob es hier Kalender gibt (siehe [`super::FreeBusyAnswer`]). Die Fensterlänge
+    /// begrenzt der Anbieter (zu lang: `Invalid` am Feld `to`), sonst wäre ein Jahres-Scan möglich. Fehler gibt es nur
+    /// für den ganzen Aufruf (`Invalid` Fenster/Zone, `Forbidden { event.freebusy }`), nie `NotFound` je Person (auch
+    /// nicht für eine KI).
     /// `view_zone`: Zone des Betrachters; legt die Lage von `AllDay` und `Floating` fest (wie bei `window`).
     /// Erweiterungspunkt Terminfindung (siehe `mod.rs`): die Suite verbraucht genau diese Methode.
     async fn free_busy(&self, who: &[Attendee], from: Utc, to: Utc, view_zone: &Zone) -> Result<Vec<Availability>>;

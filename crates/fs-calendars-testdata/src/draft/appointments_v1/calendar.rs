@@ -6,8 +6,8 @@ use super::{ImportReport, ObjectId, PersonRef, Reference, Revision, Utc, Zone};
 
 /// Ein Kalender. Sichtbarkeit und Farbe in der Seitenleiste sind Einstellung der Person, nicht Daten; `color` hier
 /// ist die Vorgabe des Kalenders. `owner`: Person, Gruppe oder Organisation (`PersonArt::Person`/`Group`/
-/// `Organization`; `Profile` und KI-Konten nie, Frage 22: JA); WAS jemand darf, sagt fs-access (Rechte-Teil-Trait),
-/// nicht dieses Feld. `trash`: `None` = nicht gelöscht, `Some` = im Papierkorb (nur mit `Trash::Include`/`Only`).
+/// `Organization`; Frage 22: JA; `Profile` nie (`Invalid`), ein KI-Konto nie (`Forbidden`, Eigentum ist Verwaltung,
+/// ADR 0056, wie `tasks_v1`)); WAS jemand darf, sagt fs-access (Rechte-Teil-Trait), nicht dieses Feld. `trash`: `None` = nicht gelöscht, `Some` = im Papierkorb (nur mit `Trash::Include`/`Only`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CalendarInfo {
     pub id: ObjectId,
@@ -32,15 +32,28 @@ pub enum CalendarSource {
     /// source: <IRI dieses Kalenders> }`, NIE die Feed-Adresse (sie kann geheim sein, siehe [`Subscription`]).
     Subscribed(Subscription),
     /// Sammlung eines Kontos (`CalDAV`, RFC 4791; Frage 23). `collection`: IRI der Sammlung, `state`: letzter Abgleich.
+    /// `collection` ist wie [`Subscription::url`] zu behandeln (Pfade tragen oft Konto-Mail oder Kennung): sichtbar nur
+    /// mit `calendar.update` an diesem Kalender (sonst `None`), nie im Verlauf als Klartext, nie in `Origin.source` oder
+    /// einem Export. Die Adressregel von [`Subscription`] (SSRF) gilt auch beim Einrichten eines Kontos (Programm).
     /// Der Abgleich (Sync-Token, `ETag` je Termin in `Origin.foreign_etag`) ist Technik des Anbieters, kein Vertrag.
-    Account { collection: Reference, state: FetchState },
+    Account { collection: Option<Reference>, state: FetchState },
 }
 
 /// Ein Abo: Quelle, Abrufregel, letzter Abruf und Fehlerzustand.
 ///
-/// `url`: nur `https:` und `webcal:` (= https); jedes andere Schema, ein Ziel in einem privaten, Link-lokalen oder
-/// Loopback-Netz (auch über DNS oder eine Umleitung dorthin) ist `Invalid` am Feld `url` (Schutz vor SSRF), beim
-/// Anlegen wie bei jedem Abruf. Größen- und Zeitgrenzen des Abrufs setzt das Programm. Die Adresse kann ein Geheimnis
+/// Adressregel (Schutz vor SSRF; beim Anlegen, bei jedem Abruf und beim Einrichten eines Kontos), sonst `Invalid` am
+/// Feld `url` (bzw. `collection`):
+/// - nur `https:` und `webcal:` (= https); Zugangsdaten in der Adresse (`user:pass@`) sind `Invalid`;
+/// - geprüft wird die IP, mit der wirklich verbunden wird: auflösen, prüfen, an GENAU diese IP verbinden (kein
+///   DNS-Rebinding); jede Umleitung wird neu geprüft und darf nur auf `https:` zeigen (nie zurück auf `http:`);
+/// - gesperrt ist jeder Bereich, den die IANA-Register "IPv4/IPv6 Special-Purpose Address" als nicht global
+///   erreichbar führen (u. a. `0.0.0.0/8`, `10/8`, `100.64/10`, `127/8`, `169.254/16` samt Cloud-Metadaten,
+///   `172.16/12`, `192.168/16`, `::`, `::1`, `fc00::/7`, `fe80::/10`, Multicast), auch in eingebetteter Form
+///   (`::ffff:a.b.c.d`, `64:ff9b::/96`, 6to4 `2002::/16`); ein System-Proxy nur, wenn er dieselbe Prüfung macht;
+///   "privates Netz erlaubt" gibt es nur als Betreiber-Schalter des Programms (Home-Server), nie im Trait;
+/// - Fehlercodes (`FetchState::Failed.reason`, `Loss.reason`, `Problem`) nennen nie die Adresse.
+///
+/// Größen- und Zeitgrenzen des Abrufs setzt das Programm. Die Adresse kann ein Geheimnis
 /// tragen ("geheime Adresse"): sichtbar nur für Personen mit `calendar.update` an diesem Kalender (sonst `None`), nie im
 /// Verlauf als Klartext (dort nur "geändert"), nie in `Origin.source` oder einem Export.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -63,12 +76,13 @@ pub enum FetchState {
     Never,
     /// Letzter Abruf gelungen.
     Fresh { at: Utc },
-    /// Letzter Abruf gescheitert (`reason` = Code, kein Satz); `attempts` gescheiterte Abrufe in Folge.
+    /// Letzter Abruf gescheitert (`reason` = Code, kein Satz, nie die Adresse); `attempts` gescheiterte Abrufe in Folge.
     Failed { at: Utc, reason: String, last_success: Option<Utc>, attempts: u32 },
 }
 
 /// Änderung eines Kalenders: `Some` = setzen, `None` = bleibt. `url`/`refresh` nur bei einem Abo, sonst `Invalid`.
-/// `owner` = Übergabe an eine andere Person oder Gruppe (Recht aus fs-access; nie an eine KI, `Invalid`).
+/// `owner` = Übergabe an eine andere Person oder Gruppe (Recht aus fs-access; an eine KI `Forbidden{calendar.update}`,
+/// an ein `Profile` `Invalid`).
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct CalendarPatch {
     pub name: Option<String>,

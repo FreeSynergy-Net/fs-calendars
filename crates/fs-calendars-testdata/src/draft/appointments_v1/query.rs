@@ -73,9 +73,10 @@ pub struct Availability { pub who: Attendee, pub answer: FreeBusyAnswer }
 pub enum FreeBusyAnswer {
     /// Belegte Zeiten (ohne Titel), leer = frei.
     Busy(Vec<Busy>),
-    /// Die Person gibt ihre Zeiten der fragenden Person (bzw. dieser Umfrage) nicht frei.
+    /// Die Person gibt ihre Zeiten der fragenden Person nicht frei (Einstellung der Person, fs-access). Immer diese
+    /// Antwort ohne Freigabe, gleich ob die Person hier Kalender hat oder nicht: sonst verriete sie das.
     NotShared,
-    /// Kein Kalender bekannt (fremde Person, Gast ohne Konto).
+    /// Der Anbieter führt diesen Teilnehmer nicht (Gast-Profil, fremde Ressource); nie für eine Person ohne Freigabe.
     Unknown,
 }
 /// Eine belegte Zeit.

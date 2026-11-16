@@ -3,12 +3,14 @@
 //! Ordner (ADR 0043, jede Datei <= 300 Zeilen), ARBEITS-FIXPUNKT per `tools/hash-ordner.sh appointments_v1` (SHA-256
 //! über sortierte relative Pfade und Inhalte, `LC_ALL=C`). Vorgänger-Fixpunkt `2b7fc98b…19b8` (Stand-in-Typen). Dieser
 //! Stand = Typ-Tausch (Entscheidung 21, 2026-11-16: vor dem ersten Release IN v1 geändert, kein Sprung auf v2) plus
-//! Kalender verwalten, Papierkorb-Frist, Abo- und Konto-Kalender, Nutzerantworten 22-25 (Runde 2 nach Opus-Review).
+//! Kalender verwalten, Papierkorb-Frist, Abo- und Konto-Kalender, Nutzerantworten 22-25 (Runde 2 nach Opus-Review),
+//! Nachlauf K1-K8 (Freigabe, Konto-Adresse, SSRF, KI-Eigentum, Papierkorb wie `tasks_v1`, Personen über fs-people).
 //! Feature-Freeze: offen (Nutzer).
 //! Dateien: `mod.rs` (dieser Kopf), `shared.rs` (`pub use` aus fs-types), `errors.rs` (Fehler des Themas), `time.rs`
 //! (`Span`, `When`; `Origin` aus fs-jscalendar), `parts.rs` (Unterobjekte; Regel und Erinnerung aus fs-jscalendar),
 //! `calendar.rs` (Kalender, Abo, Papierkorb-Frist), `appointment.rs`, `query.rs`, `api.rs` (Trait `Appointments`),
-//! `exchange.rs` (Grenze `Exchange`, verbrauchtes `PersonDirectory`).
+//! `exchange.rs` (Grenze `Exchange`). Personen: `PersonDirectory` aus `person_directory_v1` (fs-people), verbraucht
+//! wie in `tasks_v1` (der Anbieter bekommt ihn im Konstruktor; kein eigener Port, kein Import hier).
 //!
 //! GEMEINSAME TYPEN (Pins: fs-types = fs-interfaces Tag v0.0.22, fs-jscalendar Tag v0.0.2, der fs-types v0.0.22
 //! verwendet; immer per `tag`, nie per `rev` desselben Commits: sonst stehen ZWEI fs-types im Lock und die Typen sind
@@ -27,7 +29,8 @@
 //! geprüft); die Uhr ebenso (Papierkorb-Frist, Abruf). Jedes Schreiben auf Bestehendes ist Vergleich-und-Setzen gegen
 //! `expected: Revision`; ausgenommen Anlegen, `restore`, `restore_calendar`, `refresh_calendar`, `purge`.
 //! KI (ADR 0056, Nutzerantwort 29 "KI-Helfer nur auf Einladung"): ein KI-Konto ist nie Eigentümer eines Kalenders
-//! (`Invalid` am Feld `owner`) und darf nie `purge`, `delete_calendar`, `subscribe_calendar` (`Forbidden`); es handelt
+//! (`Forbidden { calendar.create | calendar.update }`, Eigentum ist Verwaltung, wie `tasks_v1`; ein `Profile` als
+//! Eigentümer ist `Invalid`) und darf nie `purge`, `delete_calendar`, `subscribe_calendar` (`Forbidden`); es handelt
 //! nur als eingeladener Helfer einer Person (Teilnehmer bzw. Recht aus fs-access, jederzeit entziehbar). Was es nicht
 //! sehen darf (fremde oder sensible Kalender), antwortet wie eine unbekannte Id (`NotFound`), nicht `Forbidden`.
 //! Papierkorb (ADR 0073 Nachtrag 2026-11-16): Löschen = Papierkorb mit Frist ([`Restorable`]); die Frist ist eine
@@ -46,8 +49,9 @@
 //!
 //! ERWEITERUNGSPUNKT Terminfindung ("Doodle", pilot-terminfindung/PLAN.md): KEIN Feature dieses Traits. Die
 //! Abstimmung ist eine SUITE; Umfrage, Vorschläge und Stimmen gehören fs-forms, Gäste ohne Konto kommen über
-//! fs-admission und `PersonDirectory::propose` als `PersonRef` (`Profile`). Dieser Trait liefert nur: `free_busy`
-//! (`Availability`: belegt / nicht freigegeben / unbekannt; nur in den vorgeschlagenen Fenstern, nur mit Zustimmung),
+//! fs-admission und `propose` von `person_directory_v1` als `PersonRef` (`Profile`). Dieser Trait liefert nur:
+//! `free_busy` (`Availability`: belegt / nicht freigegeben / unbekannt; Freigabe = Einstellung der Person gegenüber der
+//! fragenden Person, nie je Umfrage; die Suite fragt nur `who = [ich]` in den vorgeschlagenen Fenstern),
 //! `create` (Vormerkung `Status::Tentative`) + `invite` im Kalender des Besitzers (Person oder Gruppe), `respond`
 //! (auch `proposal`). Umfrage und Termin verweisen über `links` (IRI) aufeinander, kein eigenes Feld.
 //!
