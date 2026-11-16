@@ -12,15 +12,9 @@ rust-version.workspace = true
 name = "fs-calendar"
 path = "src/main.rs"
 
-[features]
-default = ["gui"]
-# The window. Servers and machines without a screen build with --no-default-features.
-gui = ["dep:fs-calendar-app"]
-
 [dependencies]
 fs-calendar-server = { path = "../fs-calendar-server" }
 fs-calendar-cli = { path = "../fs-calendar-cli" }
-fs-calendar-app = { path = "../fs-calendar-app", optional = true }
 
 [dev-dependencies]
 fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.22", features = ["rpc"] }

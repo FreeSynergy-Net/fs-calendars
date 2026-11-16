@@ -48,12 +48,21 @@ fn a_command_reaches_a_missing_server_with_exit_1() {
     assert!(err.contains("fs-calendar:"), "{err}");
 }
 
-#[cfg(not(feature = "gui"))]
 #[test]
-fn without_the_gui_the_bare_command_prints_help() {
-    let (code, out, _) = run(&[]);
-    assert_eq!(code, Some(0));
-    assert!(out.contains("fs-calendar serve"), "{out}");
+fn the_window_is_not_available_says_so_in_german_and_english_with_the_way_on() {
+    for args in [&["app"][..], &[][..], &["app", "--x"][..]] {
+        let (code, out, err) = run(args);
+        assert_eq!(code, Some(2), "{args:?}");
+        assert!(out.is_empty(), "{out}");
+        for word in [
+            "noch nicht verfügbar",
+            "not available in this version yet",
+            "fs-calendar --help",
+            "fs-calendar serve",
+        ] {
+            assert!(err.contains(word), "{word} missing in {err}");
+        }
+    }
 }
 
 #[test]

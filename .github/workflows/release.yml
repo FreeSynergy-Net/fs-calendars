@@ -1,6 +1,8 @@
 name: release
+# No calendar release until the window is ported (DESIGN.md "Admin window", see A): the tag trigger is off, the job
+# runs only by hand. Restore `push: { tags: ["v*"] }` with the port.
 on:
-  push: { tags: ["v*"] }
+  workflow_dispatch:
 permissions:
   contents: write
   id-token: write

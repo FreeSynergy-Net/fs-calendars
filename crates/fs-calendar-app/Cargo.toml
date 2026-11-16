@@ -1,11 +1,14 @@
 [package]
 name = "fs-calendar-app"
 description = "The calendar program of FreeSynergy: the generated admin window over the Event description (ADR 0066), in the window shell (ADR 0065)"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+version = "0.0.4"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["FreeSynergy <support@freesynergy.net>"]
+repository = "https://github.com/FreeSynergy/fs-calendar"
+
+# Outside the main workspace until the port (DESIGN.md, "Admin window"): own root, own Cargo.lock, old fs-components pin.
+[workspace]
 
 [dependencies]
 fs-calendar-core = { path = "../fs-calendar-core" }
@@ -33,3 +36,10 @@ tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 tempfile = "3"
 async-trait = "0.1"
 tokio = { version = "1", features = ["full"] }
+
+# Window resize crash (wgpu validation error when the window is enlarged): compositor cache sized by the window,
+# not by the target texture. Pinned to a commit (coding.md section 8).
+[patch.crates-io]
+blinc_app = { git = "https://github.com/FreeSynergy/blinc-app-fix", rev = "5180d4eae80034d851d98464861f098d69eceaf0" }
+# Restyle only the nodes an incremental update replaced (blinc-layout-fix, same change as Blinc pull request 71).
+blinc_layout = { git = "https://github.com/FreeSynergy/blinc-layout-fix", rev = "cb17db8111f2037473e6e02b6784628ca0dca151" }

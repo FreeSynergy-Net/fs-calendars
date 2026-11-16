@@ -1,9 +1,8 @@
 //! `fs-calendar`: the one program of FreeSynergy.Calendar (ADR 0063).
 //!
 //! Pattern: Command — the first word picks the subcommand and each one is a library of its own:
-//! `serve` (`fs-calendar-server`), `app` or no word at all (`fs-calendar-app`, feature `gui`), anything else
-//! is a command of the command line (`fs-calendar-cli`). Without the feature `gui` the bare command
-//! prints the help, so a server does not hang on graphics libraries.
+//! `serve` (`fs-calendar-server`), `app` or no word at all (the window: not available until the port, a message with exit
+//! code 2), anything else is a command of the command line (`fs-calendar-cli`).
 
 use std::ffi::OsString;
 
@@ -28,18 +27,13 @@ fn dispatch(words: &[String]) -> i32 {
     }
 }
 
-#[cfg(feature = "gui")]
-fn window(args: &[String]) -> i32 {
-    fs_calendar_app::app_command(args)
+/// The window is not in this version: it is being ported to the new frontend library (DESIGN.md, "Admin window").
+/// Say so in both languages, with the way on, and refuse with the usage exit code 2.
+fn window(_args: &[String]) -> i32 {
+    eprintln!("{WINDOW_UNAVAILABLE_DE}");
+    eprintln!("{WINDOW_UNAVAILABLE_EN}");
+    2
 }
 
-#[cfg(not(feature = "gui"))]
-fn window(args: &[String]) -> i32 {
-    if args.is_empty() {
-        println!("{}", fs_calendar_cli::HELP);
-        0
-    } else {
-        eprintln!("fs-calendar: this build has no window (feature gui)");
-        2
-    }
-}
+const WINDOW_UNAVAILABLE_DE: &str = "fs-calendar: Die Kalender-Oberfläche ist in dieser Version noch nicht verfügbar (sie wird gerade auf die neue Oberflächen-Bibliothek umgestellt). Nutze bis dahin die Kommandos `fs-calendar --help` (Terminal) bzw. den Server (`fs-calendar serve`).";
+const WINDOW_UNAVAILABLE_EN: &str = "fs-calendar: The calendar window is not available in this version yet (it is being moved to the new frontend library). Until then use the commands of `fs-calendar --help` (terminal) or the server (`fs-calendar serve`).";

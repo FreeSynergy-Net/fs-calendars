@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["crates/fs-calendar-core", "crates/fs-calendar-server", "crates/fs-calendar-tasks", "crates/fs-calendar-app", "crates/fs-calendar-cli", "crates/fs-calendar", "crates/fs-calendar-testdata", "crates/fs-calendar-local"]
+# Until the port, see DESIGN.md "Admin window": the app has its own Cargo.lock and old fs-components pin.
+exclude = ["crates/fs-calendar-app"]
+members = ["crates/fs-calendar-core", "crates/fs-calendar-server", "crates/fs-calendar-tasks", "crates/fs-calendar-cli", "crates/fs-calendar", "crates/fs-calendar-testdata", "crates/fs-calendar-local"]
 
 [workspace.package]
 authors = ["FreeSynergy <support@freesynergy.net>"]
@@ -9,10 +11,3 @@ version = "0.0.4"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.85"
-
-# Window resize crash (wgpu validation error when the window is enlarged): compositor cache sized by the window,
-# not by the target texture. Pinned to a commit (coding.md section 8).
-[patch.crates-io]
-blinc_app = { git = "https://github.com/FreeSynergy/blinc-app-fix", rev = "5180d4eae80034d851d98464861f098d69eceaf0" }
-# Restyle only the nodes an incremental update replaced (blinc-layout-fix, same change as Blinc pull request 71).
-blinc_layout = { git = "https://github.com/FreeSynergy/blinc-layout-fix", rev = "cb17db8111f2037473e6e02b6784628ca0dca151" }
