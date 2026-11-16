@@ -51,6 +51,8 @@ pub enum Mutant {
     RestoreSubscribedForbidden,
     /// A retention of an appointment does not keep its trashed calendar (it goes at the calendar's deadline).
     DeadlineIgnoresHold,
+    /// A kept calendar loses its trashed appointments (the period takes them although the calendar is kept).
+    HeldCalendarLosesAppointments,
     /// A recurrence given as `Original` is accepted at `create`.
     OriginalAccepted,
 }

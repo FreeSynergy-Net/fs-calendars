@@ -232,7 +232,7 @@ pub(super) async fn period(cx: &mut Cx<'_>) {
         );
     }
     let _ = db;
-    if cx.fx.advance_clock(3650 * DAY).await {
+    if cx.advance(3650 * DAY, "Manual").await {
         cx.ensure(
             cx.all(&[c.id], Trash::Only)
                 .await
@@ -251,8 +251,6 @@ pub(super) async fn period(cx: &mut Cx<'_>) {
             dir.purge(a.id).await.is_ok(),
             "purge: the way out of Manual",
         );
-    } else {
-        cx.skip("Manual: the fixture cannot move the clock");
     }
     // The deadline: after the period everything is gone for good.
     if !cx.fx.set_trash_period(Some(30 * DAY)).await {
@@ -271,7 +269,7 @@ pub(super) async fn period(cx: &mut Cx<'_>) {
         matches!(d.restorable, Restorable::Until(_)),
         "delete: a period gives Until",
     );
-    if cx.fx.advance_clock(31 * DAY).await {
+    if cx.advance(31 * DAY, "restore: after the deadline").await {
         let r = dir.restore(t.id, SeriesScope::Whole).await;
         cx.fails(
             &r,
@@ -282,7 +280,5 @@ pub(super) async fn period(cx: &mut Cx<'_>) {
             cx.all(&[c2.id], Trash::Only).await.is_empty(),
             "list(Only): nothing after the deadline",
         );
-    } else {
-        cx.skip("restore: after the deadline (the fixture cannot move the clock)");
     }
 }

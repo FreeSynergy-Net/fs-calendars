@@ -36,8 +36,7 @@ pub(super) async fn kept_calendar(cx: &mut Cx<'_>) {
         cx.skip("deadline: the fixture cannot keep an object");
         return;
     }
-    if !cx.fx.advance_clock(31 * DAY).await {
-        cx.skip("deadline: the fixture cannot move the clock");
+    if !cx.advance(31 * DAY, "deadline").await {
         return;
     }
     cx.ensure(
@@ -53,7 +52,7 @@ pub(super) async fn kept_calendar(cx: &mut Cx<'_>) {
         left.iter().any(|s| s.id == other.id),
         "deadline: the other appointments of the kept calendar stay with it",
     );
-    if cx.fx.advance_clock(30 * DAY).await {
+    if cx.advance(30 * DAY, "deadline: end of the retention").await {
         cx.ensure(
             cx.listed(k.id).await.is_none(),
             "deadline: when the retention has ended the calendar goes",
@@ -65,4 +64,47 @@ pub(super) async fn kept_calendar(cx: &mut Cx<'_>) {
         let r = dir.restore(kept.id, SeriesScope::Whole).await;
         cx.ensure(r.is_err(), "deadline: the kept appointment is gone then");
     }
+}
+
+/// A kept calendar keeps what went to the trash with it: its appointments stay (and come back with it) while the
+/// retention lasts. (Restoring after the period is not asserted: the layer's `untrash` refuses it, see the report.)
+pub(super) async fn kept_calendar_keeps_appointments(cx: &mut Cx<'_>) {
+    let dir = cx.dir;
+    let Some(now) = cx.fx.now() else {
+        return;
+    };
+    if !cx.fx.set_trash_period(Some(30 * DAY)).await {
+        return;
+    }
+    let Some(k) = cx.calendar("deadline-held-calendar").await else {
+        return;
+    };
+    let (Some(_), Some(_)) = (
+        cx.appointment(k.id, "one", 6).await,
+        cx.appointment(k.id, "two", 7).await,
+    ) else {
+        return;
+    };
+    let end = Utc::from_millis(now.millis() + 60 * DAY);
+    if !cx.fx.hold(k.id, Some(end)).await {
+        cx.skip("deadline: the fixture cannot keep a calendar");
+        return;
+    }
+    if dir.delete_calendar(k.id, k.revision).await.is_err() {
+        cx.ensure(false, "delete_calendar: answers");
+        return;
+    }
+    if !cx.advance(31 * DAY, "deadline: kept calendar").await {
+        return;
+    }
+    cx.ensure(
+        cx.listed(k.id)
+            .await
+            .is_some_and(|c| c.trash == Some(Restorable::Held(Some(end)))),
+        "deadline: a kept calendar stays beyond the period (Held(Some(end)))",
+    );
+    cx.ensure(
+        cx.all(&[k.id], Trash::Only).await.len() == 2,
+        "deadline: a kept calendar keeps its appointments (both are still in the trash)",
+    );
 }

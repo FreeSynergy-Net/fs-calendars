@@ -5,7 +5,12 @@
 //! A retention (`hold`) of an appointment keeps its trashed calendar too (the trait rule "a retention goes before the
 //! period"): the layer's `due` looks only at the calendar's own retention and would take the appointments along, so the
 //! run first puts a temporary retention on such a calendar and its trashed appointments and takes it off afterwards
-//! (the same transaction; nothing of it is visible outside).
+//! (the same transaction; nothing of it is visible outside). The calendar's own retention counts as well: a kept
+//! calendar keeps the appointments that went with it.
+//!
+//! The layer lists a due calendar AND its due appointments and the final delete of the calendar takes the appointments
+//! along, so the next delete would meet `NotFound` and roll the whole run back for good. The run therefore deletes the
+//! due calendars first (appointments after them are not listed any more).
 //!
 //! Pattern: Template method (the layer owns the loop and the final delete of the trash; the hook is the calendar's
 //! part), plus an Adapter for the counts.
@@ -44,6 +49,7 @@ pub struct Swept {
 /// The engine's error.
 pub async fn sweep_expired(c: &Conn<'_>, now: i64, actor: &PersonRef) -> Result<Swept> {
     let guarded = guard_kept(c, now).await?;
+    let calendars = delete_due_calendars(c, now).await?;
     let done = v5::purge::sweep(c.inner(), &DOMAIN, now, actor)
         .await
         .map_err(adapt)?;
@@ -52,28 +58,60 @@ pub async fn sweep_expired(c: &Conn<'_>, now: i64, actor: &PersonRef) -> Result<
         cuts: done.rows.iter().map(|(_, n)| *n).sum(),
         hidden: done.changed_of(HIDDEN),
         scrubbed: done.changed_of(SCRUBBED),
-        objects: done.objects,
+        objects: done.objects + calendars,
     })
+}
+
+/// The final delete of the calendars whose period is over (and that nothing keeps), with everything in them; the count
+/// is every object that went (the calendar and the appointments taken along that were due themselves).
+async fn delete_due_calendars(c: &Conn<'_>, now: i64) -> Result<usize> {
+    let due = v5::envelope::due(c.inner(), now).await.map_err(adapt)?;
+    let mut calendars = Vec::new();
+    for id in &due {
+        let is_calendar = c
+            .query(
+                "SELECT 1 FROM calendar_collection WHERE id = ?",
+                vec![id_value(*id)],
+            )
+            .await?;
+        if !is_calendar.is_empty() {
+            calendars.push(*id);
+        }
+    }
+    for id in &calendars {
+        crate::envelope::delete_final(c, *id).await?;
+    }
+    let mut gone = 0;
+    for id in &due {
+        if !calendars.contains(id)
+            && c.query("SELECT 1 FROM objects WHERE id = ?", vec![id_value(*id)])
+                .await?
+                .is_empty()
+        {
+            gone += 1;
+        }
+    }
+    Ok(gone + calendars.len())
 }
 
 /// What a temporary retention replaced: the object and its own retention before (`None` = none).
 type Guarded = Vec<(ObjectId, Option<Option<i64>>)>;
 
-/// Trashed calendars whose period is over but that keep an appointment longer: they and their trashed appointments
-/// get the latest end of those retentions (`None` = without end) until the run is done.
+/// Trashed calendars that something keeps (an appointment of them, or the calendar itself): they and their trashed
+/// appointments get the latest end of those retentions (`None` = without end) until the run is done.
 async fn guard_kept(c: &Conn<'_>, now: i64) -> Result<Guarded> {
     let due = c
         .query(
             "SELECT k.id FROM calendar_collection k JOIN objects o ON o.id = k.id WHERE o.deleted IS NOT NULL \
-             AND o.purge_after IS NOT NULL AND o.purge_after <= ?",
-            vec![int(now)],
+             AND o.purge_after IS NOT NULL",
+            Vec::new(),
         )
         .await?;
     let mut done = Guarded::new();
     for row in &due {
         let ids = crate::calendar_ops::kept_by(c, get_id(row, 0)?).await?;
         let mut latest: Option<Option<i64>> = None;
-        for id in &ids[1..] {
+        for id in &ids {
             match hold::held_until(c.inner(), *id).await.map_err(adapt)? {
                 Some(None) => latest = Some(None),
                 Some(Some(t)) if t > now && latest != Some(None) => {

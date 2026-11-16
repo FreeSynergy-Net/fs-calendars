@@ -118,6 +118,19 @@ impl Appointments for Wrap {
         let mut r = self.0.list(q, after, size).await;
         if let Ok(p) = &mut r {
             crate::tamper::trash_view(self.1, &mut p.items);
+            if is(self.1, Mutant::HeldCalendarLosesAppointments) {
+                let held = self.0.calendars(Trash::Only).await.is_ok_and(|l| {
+                    l.iter().any(|c| {
+                        matches!(
+                            c.trash,
+                            Some(fs_calendars_testdata::draft::Restorable::Held(_))
+                        )
+                    })
+                });
+                if held {
+                    p.items.retain(|s| s.trash.is_none());
+                }
+            }
         }
         r
     }

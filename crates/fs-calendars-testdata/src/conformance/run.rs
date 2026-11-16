@@ -56,6 +56,7 @@ pub async fn run_conformance(fx: &dyn ConformanceFixture) -> Report {
         // The clock moves last: later rules would see a different "now".
         rules_purge::period(&mut cx).await;
         rules_deadline::kept_calendar(&mut cx).await;
+        rules_deadline::kept_calendar_keeps_appointments(&mut cx).await;
     } else {
         cx.skip("purge: the provider does not offer trash.purge");
     }

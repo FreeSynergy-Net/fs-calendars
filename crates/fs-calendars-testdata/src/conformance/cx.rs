@@ -2,7 +2,7 @@
 //!
 //! Pattern: Test helper (plain functions; a setup that fails is a failure of the rule "setup", never a panic).
 
-use super::fixture::ConformanceFixture;
+use super::fixture::{Advance, ConformanceFixture};
 use crate::draft::{
     Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, AppointmentSummary,
     Appointments, CalendarInfo, Error, ObjectId, Result, Trash, When, Zone,
@@ -48,6 +48,21 @@ impl<'a> Cx<'a> {
 
     pub(crate) fn skip(&mut self, rule: &str) {
         self.report.skipped.push(rule.to_owned());
+    }
+
+    /// Move the clock: `true` when moved; not offered = skipped (named by `rule`); a failed move is a failure.
+    pub(crate) async fn advance(&mut self, millis: i64, rule: &str) -> bool {
+        match self.fx.advance_clock(millis).await {
+            Advance::Done => true,
+            Advance::Unsupported => {
+                self.skip(&format!("{rule} (the fixture cannot move the clock)"));
+                false
+            }
+            Advance::Failed(why) => {
+                self.ensure(false, &format!("{rule}: the clock move failed: {why}"));
+                false
+            }
+        }
     }
 
     /// The call must fail, and the error must be the wanted one.

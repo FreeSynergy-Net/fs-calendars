@@ -197,3 +197,11 @@ async fn a_deadline_that_takes_a_kept_calendar_fails() {
 async fn an_original_rule_that_can_be_made_fails() {
     notices(Mutant::OriginalAccepted, "cannot be made").await;
 }
+#[tokio::test]
+async fn a_kept_calendar_that_loses_its_appointments_fails() {
+    notices(
+        Mutant::HeldCalendarLosesAppointments,
+        "a kept calendar keeps its appointments",
+    )
+    .await;
+}

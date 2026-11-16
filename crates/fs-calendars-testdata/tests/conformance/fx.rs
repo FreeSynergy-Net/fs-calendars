@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use fs_calendars_testdata::FakeAppointments;
-use fs_calendars_testdata::conformance::{Asker, ConformanceFixture};
+use fs_calendars_testdata::conformance::{Advance, Asker, ConformanceFixture};
 use fs_calendars_testdata::draft::{Appointments, Attendee, ObjectId, PersonRef, Utc};
 use fs_calendars_testdata::ids::person;
 
@@ -62,10 +62,10 @@ impl ConformanceFixture for Fx {
         self.fake.allow_ai(calendar);
         true
     }
-    async fn advance_clock(&self, millis: i64) -> bool {
+    async fn advance_clock(&self, millis: i64) -> Advance {
         self.fake
             .set_now(Utc::from_millis(self.fake.now().millis() + millis));
-        true
+        Advance::Done
     }
     async fn set_trash_period(&self, millis: Option<i64>) -> bool {
         self.fake.set_trash_period(millis);

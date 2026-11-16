@@ -18,6 +18,18 @@ pub enum Asker {
     Other,
 }
 
+/// The answer of [`ConformanceFixture::advance_clock`]: moved, not offered, or tried and failed. A failed move is a
+/// failure of the rule, never a quiet skip.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Advance {
+    /// The clock moved and the period run ended without error.
+    Done,
+    /// The fixture cannot move the clock; the rules that need it are reported as skipped.
+    Unsupported,
+    /// The fixture tried and the move (or the period run behind it) failed: the reason.
+    Failed(String),
+}
+
 /// The provider under test plus the mutators behind it. A mutator the provider cannot offer keeps its default
 /// (`false` / `None`); the rules that need it are skipped.
 #[async_trait]
@@ -45,9 +57,9 @@ pub trait ConformanceFixture: Send + Sync {
         false
     }
 
-    /// Move the provider's clock forward (`true` when done).
-    async fn advance_clock(&self, _millis: i64) -> bool {
-        false
+    /// Move the provider's clock forward and run its period.
+    async fn advance_clock(&self, _millis: i64) -> Advance {
+        Advance::Unsupported
     }
 
     /// Set the trash period in ms, `None` = "never delete automatically" (`true` when done).

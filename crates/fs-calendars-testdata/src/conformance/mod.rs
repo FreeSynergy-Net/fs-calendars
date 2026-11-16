@@ -24,5 +24,5 @@ mod rules_subscribe;
 mod run;
 
 pub use cx::Report;
-pub use fixture::{Asker, ConformanceFixture};
+pub use fixture::{Advance, Asker, ConformanceFixture};
 pub use run::run_conformance;

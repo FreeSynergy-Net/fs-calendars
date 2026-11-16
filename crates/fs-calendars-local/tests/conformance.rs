@@ -7,7 +7,7 @@ mod common;
 
 use async_trait::async_trait;
 use common::{Fx, ms};
-use fs_calendars_testdata::conformance::{ConformanceFixture, run_conformance};
+use fs_calendars_testdata::conformance::{Advance, ConformanceFixture, run_conformance};
 use fs_calendars_testdata::draft::{Appointments, ObjectId, Utc};
 use fs_objects::v5::hold;
 use std::sync::atomic::Ordering;
@@ -22,10 +22,13 @@ impl ConformanceFixture for LocalFx {
     fn now(&self) -> Option<Utc> {
         Some(Utc::from_millis(self.0.clock.load(Ordering::SeqCst)))
     }
-    async fn advance_clock(&self, millis: i64) -> bool {
+    async fn advance_clock(&self, millis: i64) -> Advance {
         self.0.clock.fetch_add(millis, Ordering::SeqCst);
-        // The period run of the program: what the deadline ended is removed.
-        self.0.p.sweep_expired().await.is_ok()
+        // The period run of the program: what the deadline ended is removed. A failed run is a failure, not a skip.
+        match self.0.p.sweep_expired().await {
+            Ok(_) => Advance::Done,
+            Err(e) => Advance::Failed(format!("{e:?}")),
+        }
     }
     async fn set_trash_period(&self, millis: Option<i64>) -> bool {
         let Ok(c) = self.0.p.store().begin().await else {
