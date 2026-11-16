@@ -205,12 +205,9 @@ impl Exchange for LocalExchange {
         let events: Vec<Value> = sources
             .iter()
             .map(|(s, people)| {
-                let rule = s
-                    .unread
-                    .iter()
-                    .find(|(f, _)| f == "rrule")
-                    .map(|(_, t)| t.as_str());
-                event_json(&s.appointment, people, rule, &mut lost)
+                let kept = crate::exchange_export::kept_recurrence(s);
+                lost.extend(crate::exchange_export::only_in_original(s));
+                event_json(&s.appointment, people, kept.as_ref(), &mut lost)
             })
             .collect();
         let bytes = if target.0 == ICS {

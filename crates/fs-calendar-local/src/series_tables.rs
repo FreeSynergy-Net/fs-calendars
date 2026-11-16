@@ -145,13 +145,13 @@ pub const CUT_RULE: Table = Table {
     indexes: &[],
 };
 
-/// A part of an imported object that this program cannot interpret and keeps as it was written (`field` names it).
+/// A part of an imported object that this program cannot interpret. Only the mark is stored; the part itself stays in
+/// `object_original` (ADR 0086 point 5), and the export takes it from there.
 pub const UNREAD: Table = Table {
     name: "calendar_unread",
     cols: &[
         Col::req("appointment", Ref),
-        Col::req("field", Enum(&["rrule"])),
-        Col::req("text", Text),
+        Col::req("field", Enum(&["recurrence"])),
     ],
     constraints: &["PRIMARY KEY (appointment, field)", RULE_FK],
     indexes: &[],

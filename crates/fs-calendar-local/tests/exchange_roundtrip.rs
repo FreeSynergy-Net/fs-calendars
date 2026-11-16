@@ -235,3 +235,49 @@ async fn floating_survives_the_export_and_a_rule_kept_as_written_comes_back() {
     );
     assert!(out.contains("Jahrestage 2"));
 }
+
+#[tokio::test]
+async fn a_series_outside_the_subset_keeps_exdate_and_exceptions_through_an_edit() {
+    let e = ex().await;
+    let r = import_text(&e, &fixture("yearday_series.ics"), ICS_TYPE).await;
+    assert_eq!((r.created.len(), r.failed.len()), (1, 0), "{r:?}");
+    let fields: Vec<&str> = r.lost.iter().map(|l| l.field.as_str()).collect();
+    assert!(
+        fields
+            .iter()
+            .filter(|f| f.starts_with("recurrenceOverrides/"))
+            .count()
+            >= 2,
+        "the EXDATE and the exception are reported, not dropped: {fields:?}"
+    );
+    let a = e.local.get(r.created[0]).await.unwrap().unwrap();
+    assert!(
+        a.overrides.is_empty() && a.recurrence.is_empty(),
+        "shown as its first occurrence"
+    );
+    e.local
+        .update(
+            a.id,
+            a.revision,
+            AppointmentPatch {
+                title: Some("Neu".into()),
+                ..Default::default()
+            },
+            SeriesScope::Whole,
+        )
+        .await
+        .unwrap();
+    let (out, _) = export_text(&e, &[a.id], ICS_TYPE).await;
+    assert!(
+        out.contains("Neu") && out.contains("BYYEARDAY=1,100,200"),
+        "{out}"
+    );
+    assert!(
+        out.contains("EXDATE") && out.contains("20270410T090000"),
+        "the deleted occurrence stays deleted: {out}"
+    );
+    assert!(
+        out.contains("RECURRENCE-ID") && out.contains("Verschoben"),
+        "the moved occurrence stays: {out}"
+    );
+}

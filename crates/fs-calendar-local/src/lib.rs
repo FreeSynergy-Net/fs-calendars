@@ -17,6 +17,7 @@ pub mod codec;
 pub mod cuts;
 pub mod envelope;
 pub mod exchange;
+pub mod exchange_export;
 pub mod exchange_import;
 pub mod fields;
 pub mod fields_rule;

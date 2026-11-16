@@ -1,4 +1,7 @@
-//! iCalendar (RFC 5545) at the border: fixtures in the dialects of Google, Outlook and Apple (import tolerance only),
+//! iCalendar (RFC 5545) at the border: fixtures in the dialects of Google, Outlook and Apple (import tolerance only).
+//! The fixtures are SELF-WRITTEN after what those dialects are known to look like; they are not real exports (the
+//! PRODIDs only imitate the producers). The checklist lines of Google, Outlook and Apple stay open until real files exist.
+//!
 //! normalization (zone, floating, people), the original kept, and the loss report.
 
 #![allow(clippy::many_single_char_names, clippy::assert_is_empty)]
@@ -169,12 +172,15 @@ async fn a_rule_outside_the_subset_is_kept_shown_once_and_reported() {
         "{loss:?}"
     );
     let src = e.local.export_source(a.id).await.unwrap();
+    assert_eq!(
+        src.unread,
+        ["recurrence"],
+        "only the mark is stored, the rule stays in the original"
+    );
     assert!(
-        src.unread
-            .iter()
-            .any(|(f, t)| f == "rrule" && t.contains("byYearDay")),
-        "kept as written: {:?}",
-        src.unread
+        String::from_utf8(src.original.unwrap().0)
+            .unwrap()
+            .contains("BYYEARDAY=1,100,200")
     );
     let edit = fs_calendar_testdata::draft::AppointmentPatch {
         recurrence: Some(vec![fs_calendar_testdata::sample::rule(

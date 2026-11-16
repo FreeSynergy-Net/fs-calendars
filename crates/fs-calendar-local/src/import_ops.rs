@@ -81,8 +81,8 @@ pub async fn import_one(
         }
         a = current(c, a.id).await?;
     }
-    if let Some(rule) = &read.unread_rrule {
-        set_unread(c, a.id, "rrule", rule).await?;
+    if read.unread_rule {
+        set_unread(c, a.id, "recurrence").await?;
     }
     record(c, a.id, origin, Revision(a.revision.0), now).await?;
     let appointment = current(c, a.id).await?;

@@ -1,7 +1,7 @@
 //! A recurrence rule as JSCalendar JSON (`recurrenceRule`) and back.
 //!
 //! Pattern: Adapter (typed rule to JSON and back). A rule with a part the engine does not expand is read as
-//! `None`: the caller keeps the JSON as written (`calendar_unread`) and reports a loss.
+//! `None`: the caller marks it (`calendar_unread`), keeps the part in the original and reports a loss.
 
 use fs_calendar_testdata::draft::{BasicValue, LocalDateTime};
 use fs_calendar_testdata::draft::{ByMonth, NDay, RecurrenceRule, RuleEnd};
@@ -53,11 +53,10 @@ pub fn rule_from_json(v: &Value) -> Option<RecurrenceRule> {
                 .map(|d| {
                     Some(NDay {
                         day: from_word(&DAYS, d.get("day")?.as_str()?).ok()?,
-                        nth: d
-                            .get("nthOfPeriod")
-                            .and_then(Value::as_i64)
-                            .map(|n| i16::try_from(n).ok())
-                            .map(|n| n.unwrap_or(0)),
+                        nth: match d.get("nthOfPeriod").and_then(Value::as_i64) {
+                            Some(n) => Some(i16::try_from(n).ok()?),
+                            None => None,
+                        },
                     })
                 })
                 .collect::<Option<Vec<_>>>()

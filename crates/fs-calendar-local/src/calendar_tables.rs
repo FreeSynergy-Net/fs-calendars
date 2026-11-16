@@ -11,7 +11,7 @@ use crate::spec::{
 };
 
 pub const PREFIX: &str = "calendar";
-pub const VERSION: i64 = 3;
+pub const VERSION: i64 = 4;
 pub const STATUS: &[&str] = &["confirmed", "tentative", "cancelled"];
 pub const FREE_BUSY: &[&str] = &["busy", "free"];
 pub const PRIVACY: &[&str] = &["public", "private", "secret"];

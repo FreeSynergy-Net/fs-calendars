@@ -12,8 +12,8 @@ use crate::read::load;
 /// What an export reads of one object.
 pub struct ExportSource {
     pub appointment: Appointment,
-    /// Parts kept as written: `(field, text)`.
-    pub unread: Vec<(String, String)>,
+    /// Parts this program cannot interpret (they stay in the original).
+    pub unread: Vec<String>,
     /// The received file of this object, when it is kept.
     pub original: Option<(Vec<u8>, fs_calendar_testdata::draft::MediaType)>,
 }

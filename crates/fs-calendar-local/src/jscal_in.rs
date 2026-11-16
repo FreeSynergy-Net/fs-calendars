@@ -49,7 +49,7 @@ pub struct Read {
     pub people: Vec<RawPerson>,
     pub overrides: Vec<(LocalDateTime, RawChange)>,
     /// The rule as written, when it is outside what the engine expands (kept, shown as the first occurrence only).
-    pub unread_rrule: Option<String>,
+    pub unread_rule: bool,
     pub losses: Vec<Loss>,
     pub zone_assumed: bool,
     pub prod_id: Option<String>,
@@ -130,14 +130,14 @@ pub fn read_event(v: &Value, ctx: &ImportContext) -> Result<Read> {
             .into_iter()
             .flatten(),
     );
-    let (mut read, mut unread): (Vec<RecurrenceRule>, Option<String>) = (Vec::new(), None);
+    let (mut read, mut unread): (Vec<RecurrenceRule>, bool) = (Vec::new(), false);
     for r in rules {
         match rule_from_json(r).filter(|x| check(x).is_empty()) {
             Some(x) => read.push(x),
-            None => unread = Some(r.to_string()),
+            None => unread = true,
         }
     }
-    if unread.is_some() {
+    if unread {
         losses.push(Loss { uid: Some(uid.clone()), field: "recurrence".into(), reason: "Serie nur teilweise darstellbar: the rule is outside what is expanded; kept as written, only the first occurrence is shown".into() });
         read.clear();
     }
@@ -157,16 +157,27 @@ pub fn read_event(v: &Value, ctx: &ImportContext) -> Result<Read> {
         .flatten()
     {
         let Ok(rid) = LocalDateTime::parse(k) else {
+            losses.push(Loss {
+                uid: Some(uid.clone()),
+                field: format!("recurrenceOverrides/{k}"),
+                reason: "not a local date-time: left out, kept only in the original".into(),
+            });
             continue;
         };
+        if unread {
+            losses.push(Loss {
+                uid: Some(uid.clone()),
+                field: format!("recurrenceOverrides/{k}"),
+                reason: "the series is not read, so its exceptions are not either; kept in the original and written back from it".into(),
+            });
+            continue;
+        }
         let change = if o.get("excluded").and_then(Value::as_bool) == Some(true) {
             RawChange::Excluded
         } else {
             RawChange::Changed(patch_of(o, &when, &uid, &mut losses))
         };
-        if unread.is_none() {
-            overrides.push((rid, change));
-        }
+        overrides.push((rid, change));
     }
     for k in NOT_STORED {
         if v.get(k).is_some_and(|x| !x.is_null()) {
@@ -239,7 +250,7 @@ pub fn read_event(v: &Value, ctx: &ImportContext) -> Result<Read> {
         rest,
         people,
         overrides,
-        unread_rrule: unread,
+        unread_rule: unread,
         losses,
         zone_assumed,
         prod_id: text(v, "prodId").map(str::to_owned),

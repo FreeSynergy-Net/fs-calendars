@@ -17,6 +17,14 @@ use crate::jscal_rule::rule_to_json;
 use crate::jscal_util::{format_duration, format_utc};
 use crate::words::{ALERT_ACTION, FREE_BUSY, PARTICIPATION, PRIVACY, RELATIVE_TO, STATUS, word};
 
+/// The members of an event that make up its recurrence.
+pub const RECURRENCE_KEYS: [&str; 4] = [
+    "recurrenceRule",
+    "recurrenceRules",
+    "excludedRecurrenceRules",
+    "recurrenceOverrides",
+];
+
 /// What the person directory knows of a participant: `(name, address)`, by participant key.
 pub type People = HashMap<String, (Option<String>, Option<String>)>;
 
@@ -173,12 +181,13 @@ fn override_patch(p: &AppointmentPatch, uid: &str, rid: &str, losses: &mut Vec<L
     Value::Object(o)
 }
 
-/// The event as JSON. `unread_rrule` is the rule kept as written (outside the engine's subset), written back as it was.
+/// The event as JSON. `kept` is the whole recurrence part of the original (rule, `EXDATE`/overrides) of a series whose
+/// rule is outside the engine's subset: it replaces what is built here and is written back as it was received.
 #[must_use]
 pub fn event_json(
     a: &Appointment,
     people: &People,
-    unread_rrule: Option<&str>,
+    kept: Option<&Map<String, Value>>,
     losses: &mut Vec<Loss>,
 ) -> Value {
     let mut o = Map::new();
@@ -231,10 +240,7 @@ pub fn event_json(
     if a.use_default_alerts {
         o.insert("useDefaultAlerts".into(), json!(true));
     }
-    match (
-        unread_rrule.and_then(|t| serde_json::from_str::<Value>(t).ok()),
-        a.recurrence.as_slice(),
-    ) {
+    match (None::<Value>, a.recurrence.as_slice()) {
         (Some(raw), _) => {
             o.insert("recurrenceRule".into(), raw);
         }
@@ -287,6 +293,12 @@ pub fn event_json(
                 reason: "not stored, so not written".into(),
             });
         }
+    }
+    if let Some(kept) = kept {
+        for k in RECURRENCE_KEYS {
+            o.remove(k);
+        }
+        o.extend(kept.iter().map(|(k, v)| (k.clone(), v.clone())));
     }
     Value::Object(o)
 }

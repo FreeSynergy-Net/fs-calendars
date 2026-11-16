@@ -198,29 +198,26 @@ pub async fn original_of(c: &Conn<'_>, id: ObjectId) -> Result<Option<(Vec<u8>, 
     }
 }
 
-/// Keep a part this program cannot interpret, as it was written.
+/// Mark a part this program cannot interpret (the part stays in the original).
 ///
 /// # Errors
 /// `Invalid` or the engine's error.
-pub async fn set_unread(c: &Conn<'_>, id: ObjectId, field: &str, original: &str) -> Result<()> {
-    c.insert(&UNREAD, vec![id_value(id), text(field), text(original)])
-        .await
+pub async fn set_unread(c: &Conn<'_>, id: ObjectId, field: &str) -> Result<()> {
+    c.insert(&UNREAD, vec![id_value(id), text(field)]).await
 }
 
-/// The parts of an object that could not be interpreted: `(field, text as written)`.
+/// The parts of an object that could not be interpreted (field names).
 ///
 /// # Errors
 /// `Unavailable` for a row that does not read back.
-pub async fn read_unread(c: &Conn<'_>, id: ObjectId) -> Result<Vec<(String, String)>> {
+pub async fn read_unread(c: &Conn<'_>, id: ObjectId) -> Result<Vec<String>> {
     let rows = c
         .query(
-            "SELECT field, text FROM calendar_unread WHERE appointment = ? ORDER BY field",
+            "SELECT field FROM calendar_unread WHERE appointment = ? ORDER BY field",
             vec![id_value(id)],
         )
         .await?;
-    rows.iter()
-        .map(|r| Ok((get_text(r, 0)?, get_text(r, 1)?)))
-        .collect()
+    rows.iter().map(|r| get_text(r, 0)).collect()
 }
 
 /// An edit of the rule of a series whose rule is kept as written is refused (`Unsupported`, never a silent change).
