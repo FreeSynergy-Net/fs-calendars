@@ -183,9 +183,6 @@ fn split(
     changes: Vec<FieldChange>,
 ) -> Result<Appointment> {
     let start = series_start(&cur.when).unwrap_or(at);
-    let before = cur.recurrence.first().map_or(0, |r| {
-        occurrences(r, start, at - Duration::seconds(1)).len()
-    });
     let new_id = state.fresh_id();
     let number = crate::ids::object_number(new_id);
     let first_uid = cur
@@ -203,9 +200,10 @@ fn split(
     tail.when = when_at(&cur.when, at);
     tail.overrides
         .retain(|o| naive(o.recurrence_id).is_some_and(|n| n >= at));
-    if let [only] = tail.recurrence.as_mut_slice() {
-        if let RuleEnd::Count(c) = only.end {
-            only.end = RuleEnd::Count(c.saturating_sub(u32::try_from(before).unwrap_or(u32::MAX)));
+    for (t, r) in tail.recurrence.iter_mut().zip(&cur.recurrence) {
+        if let RuleEnd::Count(c) = t.end {
+            let before = occurrences(r, start, at - Duration::seconds(1)).len();
+            t.end = RuleEnd::Count(c.saturating_sub(u32::try_from(before).unwrap_or(u32::MAX)));
         }
     }
     tail.related.retain(|r| r.relation != Relation::First);

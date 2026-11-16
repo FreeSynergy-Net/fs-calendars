@@ -13,7 +13,7 @@ use fs_calendar_testdata::instances::{series_start, when_at};
 use fs_calendar_testdata::patch::{apply, merge};
 use fs_calendar_testdata::recur::occurrences;
 use fs_calendar_testdata::scope::{occurrence, truncate};
-use fs_calendar_testdata::zone::{local, naive};
+use fs_calendar_testdata::zone::naive;
 
 use crate::clock::new_id;
 use crate::codec::{id_text, naive_secs};
@@ -130,9 +130,6 @@ pub async fn update_following(
     let cur = live(c, id, expected).await?.appt;
     let at = occurrence(&cur, rid)?;
     let start = series_start(&cur.when).unwrap_or(at);
-    let before = cur.recurrence.first().map_or(0, |r| {
-        occurrences(r, start, at - Duration::seconds(1)).len()
-    });
     let tail_id = new_id(now);
     let first_uid = cur
         .related
@@ -147,9 +144,11 @@ pub async fn update_following(
     tail.when = when_at(&cur.when, at);
     tail.overrides
         .retain(|o| naive(o.recurrence_id).is_some_and(|n| n >= at));
-    if let [only] = tail.recurrence.as_mut_slice() {
-        if let RuleEnd::Count(n) = only.end {
-            only.end = RuleEnd::Count(n.saturating_sub(u32::try_from(before).unwrap_or(u32::MAX)));
+    // Every rule counts its own occurrences: the part of a `Count` that lies before the split stays with the head.
+    for (t, r) in tail.recurrence.iter_mut().zip(&cur.recurrence) {
+        if let RuleEnd::Count(n) = t.end {
+            let before = occurrences(r, start, at - Duration::seconds(1)).len();
+            t.end = RuleEnd::Count(n.saturating_sub(u32::try_from(before).unwrap_or(u32::MAX)));
         }
     }
     tail.related.retain(|r| r.relation != Relation::First);
@@ -173,13 +172,9 @@ pub async fn update_following(
     insert(c, tail_id, "Event", &tail.title, actor, now).await?;
     write_appointment(c, &tail).await?;
     move_to_tail(c, id, &tail, naive_secs(at)).await?;
-    let cut = FieldChange {
-        field: "recurrence.until".to_owned(),
-        row_key: None,
-        old: None,
-        new: Some(Val::Local(local(at - Duration::seconds(1)))),
-    };
-    log(c, id, HistoryKind::Update, actor, now, &[cut]).await?;
+    // The head logs what changed on it: the end of the rules, `related` (`Next`) and the sequence.
+    let changes = diff(&flatten(&cur), &flatten(&head));
+    log(c, id, HistoryKind::Update, actor, now, &changes).await?;
     log(
         c,
         tail_id,

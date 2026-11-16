@@ -167,3 +167,71 @@ async fn deleting_a_changed_occurrence_and_restoring_it_gives_the_change_back() 
     );
     assert_eq!(f.count("calendar_appointment").await, 2);
 }
+
+#[tokio::test]
+async fn the_split_counts_every_rule_and_logs_the_head_fully() {
+    let f = fx().await;
+    let mut d = f.draft("Zwei Regeln", timed(rid(2), "Europe/Berlin", 60));
+    let (mut a1, mut a2) = (rule(Frequency::Weekly), rule(Frequency::Daily));
+    (a1.end, a2.end) = (RuleEnd::Count(6), RuleEnd::Count(10));
+    d.rest.recurrence = Some(vec![a1, a2]);
+    let a = f.p.create(d).await.unwrap();
+    let tail =
+        f.p.update(a.id, a.revision, title("Rest"), following(9))
+            .await
+            .unwrap();
+    assert_eq!(
+        tail.recurrence.iter().map(|r| r.end).collect::<Vec<_>>(),
+        [RuleEnd::Count(5), RuleEnd::Count(3)],
+        "weekly 2,9,.. leaves 5 of 6; daily 2..8 are 7 before the 9th, 10 - 7 = 3 left"
+    );
+    let h = f.p.history(a.id, None, 10).await.unwrap().items;
+    let fields: Vec<&str> = h[1].changes.iter().map(|c| c.field.as_str()).collect();
+    assert!(
+        fields.contains(&"related") && fields.contains(&"sequence"),
+        "{fields:?}"
+    );
+    assert!(
+        fields.iter().any(|f| f.starts_with("rule.until")),
+        "{fields:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_failing_split_leaves_the_series_as_it_was() {
+    let f = fx().await;
+    let a = weekly(&f).await;
+    // The tail's rule row will collide with the head's: the failure comes late, after the head was written.
+    f.exec("CREATE UNIQUE INDEX one_rule ON calendar_rule (frequency, excluded)")
+        .await
+        .unwrap();
+    let before = (
+        f.count("activity").await,
+        f.count("objects").await,
+        f.count("calendar_rule").await,
+    );
+    let r =
+        f.p.update(a.id, a.revision, title("Rest"), following(16))
+            .await;
+    assert!(matches!(r, Err(Error::Invalid(_))), "{r:?}");
+    assert_eq!(
+        f.p.get(a.id).await.unwrap().unwrap(),
+        a,
+        "nothing of the split is left on the series"
+    );
+    assert_eq!(
+        before,
+        (
+            f.count("activity").await,
+            f.count("objects").await,
+            f.count("calendar_rule").await
+        )
+    );
+    f.exec("DROP INDEX one_rule").await.unwrap();
+    assert!(
+        f.p.update(a.id, a.revision, title("Rest"), following(16))
+            .await
+            .is_ok(),
+        "and the next try works"
+    );
+}
