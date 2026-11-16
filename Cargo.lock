@@ -1573,6 +1573,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs-calendar-local"
+version = "0.0.4"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "fs-calendar-testdata",
+ "tokio",
+ "turso",
+]
+
+[[package]]
 name = "fs-calendar-server"
 version = "0.0.4"
 dependencies = [
