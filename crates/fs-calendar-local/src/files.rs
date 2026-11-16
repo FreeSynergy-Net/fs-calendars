@@ -59,13 +59,7 @@ impl FileStore for MemoryFiles {
             .cloned();
         let bytes = bytes
             .ok_or_else(|| Error::Unavailable(format!("no such file {}", f.iri.canonical())))?;
-        if sha256_hex(&bytes).as_bytes()
-            != f.sha256
-                .iter()
-                .map(|b| format!("{b:02x}"))
-                .collect::<String>()
-                .as_bytes()
-        {
+        if sha256_hex(&bytes) != crate::origin::hex32(&f.sha256) {
             return Err(crate::codec::invalid(
                 "source",
                 "the checksum of the file differs from its reference",

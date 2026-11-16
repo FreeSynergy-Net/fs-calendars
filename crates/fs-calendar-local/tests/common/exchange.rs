@@ -1,5 +1,5 @@
 //! Helpers of the exchange tests: a store, a directory, memory files, the fixtures.
-#![allow(dead_code)]
+#![allow(dead_code, clippy::struct_field_names)]
 
 use std::sync::Arc;
 

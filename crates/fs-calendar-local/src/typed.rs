@@ -29,14 +29,14 @@ pub fn check_value(t: &Table, c: &Col, v: &Value) -> Result<()> {
     match (c.logical, v) {
         (Logical::Int | Logical::Utc, Value::Integer(_))
         | (Logical::Bool, Value::Integer(0 | 1))
-        | (Logical::Text, Value::Text(_)) => Ok(()),
+        | (Logical::Text, Value::Text(_))
+        | (Logical::Blob, Value::Blob(_)) => Ok(()),
         (Logical::Bool, _) => bad("must be 0 or 1"),
         (Logical::Real, Value::Real(f)) if f.is_finite() => Ok(()),
         (Logical::Real, _) => bad("NaN and infinity are refused"),
         (Logical::Local, Value::Integer(s)) if DateTime::from_timestamp(*s, 0).is_some() => Ok(()),
         (Logical::Date, Value::Integer(d)) if crate::codec::int_to_date(*d).is_ok() => Ok(()),
         (Logical::Local | Logical::Date, _) => bad("not a real calendar value"),
-        (Logical::Blob, Value::Blob(_)) => Ok(()),
         (Logical::Zone, Value::Text(z)) => check_zone(&field, z),
         (Logical::Ref, Value::Text(r)) if parse_id(r).is_some() => Ok(()),
         (Logical::Ref, _) => bad("not an object id"),

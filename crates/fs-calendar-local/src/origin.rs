@@ -55,6 +55,15 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
         .concat()
 }
 
+/// Lower-case hex of 32 bytes.
+#[must_use]
+pub fn hex32(b: &[u8; 32]) -> String {
+    b.iter()
+        .map(|x| format!("{x:02x}"))
+        .collect::<Vec<_>>()
+        .concat()
+}
+
 /// The `urn:sha256:<hex>` IRI of a kept original.
 #[must_use]
 pub fn original_iri(hex: &str) -> String {

@@ -4,22 +4,21 @@
 //! `Read::losses`, and the received file stays as the original. Time: a time without a zone becomes `Timed` in the
 //! assumed zone with `zone_assumed`, unless the file says "floating" (`X-FS-FLOATING`); all-day is a date, never moved.
 
-use std::collections::HashMap;
+#![allow(clippy::too_many_lines, clippy::large_enum_variant)]
 
 use fs_calendar_testdata::draft::{
-    Alert, AlertAction, AppointmentPatch, BasicValue, ImportContext, LocalDateTime, Loss,
-    ParticipationStatus, RecurrenceRule, Result, Roles, Span, TextType, Trigger, When, Zone,
+    AppointmentPatch, BasicValue, ImportContext, LocalDateTime, Loss, ParticipationStatus,
+    RecurrenceRule, Result, Roles, TextType, When,
 };
 use fs_calendar_testdata::recur::check;
-use fs_calendar_testdata::zone::{iana, resolve};
 use serde_json::Value;
 
 use crate::codec::invalid;
+use crate::jscal_parts::{alerts_of, patch_of, people_of};
 use crate::jscal_rule::rule_from_json;
-use crate::jscal_util::{flag_keys, parse_duration, parse_offset, parse_utc};
-use crate::words::{
-    ALERT_ACTION, FREE_BUSY, PARTICIPATION, PRIVACY, RELATIVE_TO, STATUS, from_word,
-};
+use crate::jscal_time::when_of;
+use crate::jscal_util::flag_keys;
+use crate::words::{FREE_BUSY, PRIVACY, STATUS, from_word};
 
 /// A participant as the file names it, before the person directory has answered.
 #[derive(Clone, Debug)]
@@ -79,241 +78,12 @@ const NOT_STORED: [&str; 6] = [
     "replyTo",
 ];
 
-fn text<'a>(o: &'a Value, k: &str) -> Option<&'a str> {
+pub(crate) fn text<'a>(o: &'a Value, k: &str) -> Option<&'a str> {
     o.get(k).and_then(Value::as_str)
 }
 
-fn pick<T: Copy>(t: &[(T, &'static str)], o: &Value, k: &str) -> Option<T> {
+pub(crate) fn pick<T: Copy>(t: &[(T, &'static str)], o: &Value, k: &str) -> Option<T> {
     text(o, k).and_then(|w| from_word(t, w).ok())
-}
-
-fn is_floating(v: &Value) -> bool {
-    v.get("freesynergy.net:floating").and_then(Value::as_bool) == Some(true)
-        || v.pointer("/iCalendar/properties")
-            .and_then(Value::as_array)
-            .is_some_and(|ps| {
-                ps.iter().any(|p| {
-                    p.get(0).and_then(Value::as_str) == Some("x-fs-floating")
-                        && p.get(3)
-                            .and_then(Value::as_str)
-                            .is_some_and(|t| t.eq_ignore_ascii_case("true"))
-                })
-            })
-}
-
-fn zone_of_json(
-    name: &str,
-    uid: &str,
-    ctx: &ImportContext,
-    losses: &mut Vec<Loss>,
-) -> (Zone, bool) {
-    let z = iana(name);
-    if !name.starts_with('/') && resolve(&z, &HashMap::new()).is_ok() {
-        return (z, false);
-    }
-    losses.push(Loss {
-        uid: Some(uid.to_owned()),
-        field: "timeZone".into(),
-        reason: format!("zone {name} is unknown or custom; replaced by the assumed zone"),
-    });
-    (ctx.assume_zone.clone(), true)
-}
-
-fn when_of(
-    v: &Value,
-    uid: &str,
-    ctx: &ImportContext,
-    losses: &mut Vec<Loss>,
-) -> Result<(When, bool)> {
-    let start = text(v, "start").ok_or_else(|| invalid("start", "missing"))?;
-    let start =
-        LocalDateTime::parse(start).map_err(|_| invalid("start", "not a local date-time"))?;
-    let length = text(v, "duration")
-        .map_or(
-            Some(Span {
-                days: 0,
-                seconds: 0,
-            }),
-            parse_duration,
-        )
-        .ok_or_else(|| invalid("duration", "not a duration"))?;
-    if v.get("showWithoutTime").and_then(Value::as_bool) == Some(true) {
-        if v.get("timeZone").is_some_and(|z| !z.is_null()) {
-            losses.push(Loss {
-                uid: Some(uid.to_owned()),
-                field: "timeZone".into(),
-                reason: "an all-day appointment has no zone; the zone is dropped".into(),
-            });
-        }
-        if length.seconds != 0 {
-            losses.push(Loss {
-                uid: Some(uid.to_owned()),
-                field: "duration".into(),
-                reason: "an all-day appointment lasts whole days; the seconds are dropped".into(),
-            });
-        }
-        return Ok((
-            When::AllDay {
-                first: start.date(),
-                days: length.days.max(1),
-            },
-            false,
-        ));
-    }
-    match text(v, "timeZone") {
-        Some(z) => {
-            let (zone, assumed) = zone_of_json(z, uid, ctx, losses);
-            let end_zone = text(v, "endTimeZone").map(|e| zone_of_json(e, uid, ctx, losses).0);
-            Ok((
-                When::Timed {
-                    start,
-                    zone,
-                    length,
-                    end_zone,
-                    zone_assumed: assumed,
-                },
-                assumed,
-            ))
-        }
-        None if is_floating(v) => Ok((When::Floating { start, length }, false)),
-        None => Ok((
-            When::Timed {
-                start,
-                zone: ctx.assume_zone.clone(),
-                length,
-                end_zone: None,
-                zone_assumed: true,
-            },
-            true,
-        )),
-    }
-}
-
-fn alerts_of(v: &Value, uid: &str, losses: &mut Vec<Loss>) -> Vec<Alert> {
-    let Some(m) = v.get("alerts").and_then(Value::as_object) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for (key, a) in m {
-        let trig = a.get("trigger");
-        let trigger = match trig.and_then(|t| text(t, "@type")) {
-            Some("AbsoluteTrigger") => trig
-                .and_then(|t| text(t, "when"))
-                .and_then(parse_utc)
-                .map(|at| Trigger::Absolute { at }),
-            _ => trig
-                .and_then(|t| text(t, "offset"))
-                .and_then(parse_offset)
-                .map(|seconds| Trigger::Offset {
-                    seconds,
-                    relative_to: trig
-                        .and_then(|t| pick(&RELATIVE_TO, t, "relativeTo"))
-                        .unwrap_or(fs_calendar_testdata::draft::RelativeTo::Start),
-                }),
-        };
-        match trigger {
-            Some(trigger) => out.push(Alert {
-                key: key.clone(),
-                trigger,
-                action: pick(&ALERT_ACTION, a, "action").unwrap_or(AlertAction::Display),
-                acknowledged: text(a, "acknowledged").and_then(parse_utc),
-            }),
-            None => losses.push(Loss {
-                uid: Some(uid.to_owned()),
-                field: format!("alerts/{key}"),
-                reason: "the trigger cannot be read".into(),
-            }),
-        }
-    }
-    out
-}
-
-fn people_of(v: &Value, uid: &str, losses: &mut Vec<Loss>) -> Vec<RawPerson> {
-    let Some(m) = v.get("participants").and_then(Value::as_object) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for (key, p) in m {
-        let address = text(p, "calendarAddress")
-            .map(str::to_owned)
-            .or_else(|| text(p, "email").map(|e| format!("mailto:{e}")))
-            .or_else(|| {
-                p.pointer("/sendTo/imip")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned)
-            });
-        let roles = flag_keys(p.get("roles"));
-        let has = |r: &str| roles.iter().any(|x| x == r);
-        out.push(RawPerson {
-            key: key.clone(),
-            name: text(p, "name").map(str::to_owned),
-            address,
-            kind: text(p, "kind").unwrap_or("individual").to_owned(),
-            roles: Roles {
-                owner: has("owner"),
-                attendee: has("attendee") || has("required"),
-                optional: has("optional"),
-                informational: has("informational"),
-                chair: has("chair"),
-                contact: has("contact"),
-            },
-            status: pick(&PARTICIPATION, p, "participationStatus")
-                .unwrap_or(ParticipationStatus::NeedsAction),
-            expect_reply: p
-                .get("expectReply")
-                .and_then(Value::as_bool)
-                .unwrap_or(false),
-        });
-    }
-    let _ = (uid, losses);
-    out
-}
-
-fn patch_of(o: &Value, base: &When, uid: &str, losses: &mut Vec<Loss>) -> AppointmentPatch {
-    let mut p = AppointmentPatch {
-        title: text(o, "title").map(str::to_owned),
-        status: pick(&STATUS, o, "status"),
-        free_busy: pick(&FREE_BUSY, o, "freeBusyStatus"),
-        privacy: pick(&PRIVACY, o, "privacy"),
-        priority: o
-            .get("priority")
-            .and_then(Value::as_u64)
-            .and_then(|n| u8::try_from(n).ok()),
-        ..AppointmentPatch::default()
-    };
-    if let Some(d) = text(o, "description") {
-        p.description = Some((d.to_owned(), TextType::Plain));
-    }
-    if let Some(s) = text(o, "start") {
-        let mut w = base.clone();
-        if let (Ok(l), When::Timed { start, .. } | When::Floating { start, .. }) =
-            (LocalDateTime::parse(s), &mut w)
-        {
-            *start = l;
-            p.when = Some(w);
-        }
-    }
-    for k in o.as_object().into_iter().flat_map(|m| m.keys()) {
-        if ![
-            "title",
-            "description",
-            "start",
-            "status",
-            "freeBusyStatus",
-            "privacy",
-            "priority",
-            "excluded",
-        ]
-        .contains(&k.as_str())
-        {
-            losses.push(Loss {
-                uid: Some(uid.to_owned()),
-                field: format!("recurrenceOverrides/{k}"),
-                reason: "this change of one occurrence is not read".into(),
-            });
-        }
-    }
-    p
 }
 
 /// Read one event.

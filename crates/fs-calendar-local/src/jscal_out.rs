@@ -3,6 +3,8 @@
 //! Pattern: Adapter. What the form cannot hold (`excludedRecurrenceRules`, a second rule) goes into the loss list,
 //! never away quietly. Participants carry the address the person directory gave; one without an address is a loss.
 
+#![allow(clippy::too_many_lines)]
+
 use std::collections::HashMap;
 
 use fs_calendar_testdata::draft::{

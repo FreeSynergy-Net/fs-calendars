@@ -48,7 +48,7 @@ pub fn rule_from_json(v: &Value) -> Option<RecurrenceRule> {
     let by_day = o
         .get("byDay")
         .and_then(Value::as_array)
-        .map(|a| {
+        .map_or(Some(Vec::new()), |a| {
             a.iter()
                 .map(|d| {
                     Some(NDay {
@@ -61,12 +61,11 @@ pub fn rule_from_json(v: &Value) -> Option<RecurrenceRule> {
                     })
                 })
                 .collect::<Option<Vec<_>>>()
-        })
-        .unwrap_or_else(|| Some(Vec::new()))?;
+        })?;
     let by_month = o
         .get("byMonth")
         .and_then(Value::as_array)
-        .map(|a| {
+        .map_or(Some(Vec::new()), |a| {
             a.iter()
                 .map(|m| {
                     let t = m.as_str()?;
@@ -76,8 +75,7 @@ pub fn rule_from_json(v: &Value) -> Option<RecurrenceRule> {
                     })
                 })
                 .collect::<Option<Vec<_>>>()
-        })
-        .unwrap_or_else(|| Some(Vec::new()))?;
+        })?;
     let end = match (
         o.get("count").and_then(Value::as_u64),
         o.get("until").and_then(Value::as_str),

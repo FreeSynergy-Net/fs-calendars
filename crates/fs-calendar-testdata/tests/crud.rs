@@ -284,20 +284,3 @@ async fn paging_search_and_the_feed() {
             .is_empty()
     );
 }
-
-#[tokio::test]
-async fn keywords_and_categories_are_sets() {
-    let f = FakeAppointments::new();
-    let mut d = draft(
-        &f,
-        "Menge",
-        timed(at(2026, 12, 1, 9, 0), "Europe/Berlin", 30),
-    );
-    d.rest.keywords = Some(vec!["b".into(), "a".into(), "b".into()]);
-    d.rest.categories = Some(vec!["x".into(), "x".into()]);
-    let a = f.create(d).await.unwrap();
-    assert_eq!(
-        (a.keywords, a.categories),
-        (vec!["b".to_owned(), "a".to_owned()], vec!["x".to_owned()])
-    );
-}

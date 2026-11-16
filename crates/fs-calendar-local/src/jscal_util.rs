@@ -4,6 +4,8 @@
 
 use fs_calendar_testdata::draft::{BasicValue, LocalDateTime, Span, Utc};
 use fs_calendar_testdata::zone::{from_utc_ms, naive_date, to_utc_ms};
+use std::fmt::Write;
+
 use serde_json::Value;
 
 /// `P1DT2H30M`, `PT90S`, `P2W`: nominal days and exact seconds (RFC 8984 `Duration`); `None` when it is not one.
@@ -16,8 +18,8 @@ pub fn parse_duration(t: &str) -> Option<Span> {
     for ch in date.chars() {
         match ch {
             '0'..='9' => num.push(ch),
-            'W' => days += num.drain(..).collect::<String>().parse::<u64>().ok()? * 7,
-            'D' => days += num.drain(..).collect::<String>().parse::<u64>().ok()?,
+            'W' => days += std::mem::take(&mut num).parse::<u64>().ok()? * 7,
+            'D' => days += std::mem::take(&mut num).parse::<u64>().ok()?,
             _ => return None,
         }
     }
@@ -46,13 +48,13 @@ pub fn format_duration(s: Span) -> String {
     let (h, m, sec) = (s.seconds / 3600, s.seconds % 3600 / 60, s.seconds % 60);
     let mut out = String::from("P");
     if s.days > 0 {
-        out.push_str(&format!("{}D", s.days));
+        let _ = write!(out, "{}D", s.days);
     }
     if s.seconds > 0 || s.days == 0 {
         out.push('T');
         for (n, u) in [(h, 'H'), (m, 'M'), (sec, 'S')] {
             if n > 0 {
-                out.push_str(&format!("{n}{u}"));
+                let _ = write!(out, "{n}{u}");
             }
         }
         if s.seconds == 0 {
