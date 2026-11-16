@@ -29,7 +29,10 @@ pub const WHO_KINDS: &[&str] = &["actor", "resource", "location"];
 pub const SETTING: Table = Table {
     name: "setting",
     cols: &[Col::req("key", Text), Col::req("int_value", Int)],
-    constraints: &["PRIMARY KEY (key)"],
+    constraints: &[
+        "PRIMARY KEY (key)",
+        "CHECK (key <> 'trash_days' OR int_value > 0)",
+    ],
     indexes: &[],
 };
 
@@ -181,5 +184,36 @@ pub const ACTIVITY_CHANGE: Table = Table {
     indexes: &[],
 };
 
+/// Ids whose log was purged (ADR 0029, as v4); no FK: the object may live on or be gone.
+pub const PURGED_OBJECTS: Table = id_table("purged_objects");
+/// Ids whose writes are not logged (as v4).
+pub const UNLOGGED_IDS: Table = id_table("unlogged_ids");
+const ID_COLS: &[Col] = &[Col::req("object_id", Ref)];
+const ID_KEY: &[&str] = &["PRIMARY KEY (object_id)"];
+const fn id_table(name: &'static str) -> Table {
+    Table {
+        name,
+        cols: ID_COLS,
+        constraints: ID_KEY,
+        indexes: &[],
+    }
+}
+
+/// Scalar store values: `store_id`, `activity_high` (the last activity id, so ids stay monotonic).
+pub const META: Table = Table {
+    name: "meta",
+    cols: &[Col::req("key", Text), Col::req("value", Text)],
+    constraints: &["PRIMARY KEY (key)"],
+    indexes: &[],
+};
+
 /// All tables of this module, in creation order (parents first).
-pub const ALL: [Table; 4] = [SETTING, OBJECTS, ACTIVITY, ACTIVITY_CHANGE];
+pub const ALL: [Table; 7] = [
+    SETTING,
+    OBJECTS,
+    ACTIVITY,
+    ACTIVITY_CHANGE,
+    PURGED_OBJECTS,
+    UNLOGGED_IDS,
+    META,
+];

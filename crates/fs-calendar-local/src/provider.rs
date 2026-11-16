@@ -6,8 +6,8 @@
 use async_trait::async_trait;
 use fs_calendar_testdata::draft::{
     Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, AppointmentSummary,
-    Appointments, Attendee, CAPABILITIES, CalendarInfo, Capabilities, Deleted, HistoryEntry,
-    ObjectId, Page, PersonRef, Place, Result, Revision, SeriesScope, Utc, Window, Zone,
+    Appointments, CAPABILITIES, CalendarInfo, Capabilities, Deleted, HistoryEntry, ObjectId, Page,
+    PersonRef, Place, Result, Revision, SeriesScope, Utc, Window, Zone,
 };
 
 use crate::calendar_tables::{ALL, PREFIX, VERSION};
@@ -15,7 +15,7 @@ use crate::clock::Clock;
 use crate::codec::{id_value, text};
 use crate::read::load;
 use crate::store::Store;
-use crate::{history, ops, query};
+use crate::{envelope, history, ops, query};
 
 /// The local provider: the typed v5 tables of one store file; `actor` is the asking person.
 pub struct LocalAppointments {
@@ -25,10 +25,9 @@ pub struct LocalAppointments {
 }
 
 /// The capabilities this slice offers.
-const OFFERED: [&str; 8] = [
+const OFFERED: [&str; 7] = [
     "calendar.read",
     "calendar.create",
-    "event.read",
     "event.create",
     "event.update",
     "event.delete",
@@ -58,6 +57,36 @@ impl LocalAppointments {
             actor,
             clock,
         })
+    }
+
+    /// Log purge (ADR 0029): the log of the object goes, the object stays; not part of the trait.
+    ///
+    /// # Errors
+    /// `NotFound` when there is no such object.
+    pub async fn purge_log(&self, id: ObjectId) -> Result<()> {
+        let c = self.store.begin().await?;
+        let r = envelope::purge_log(&c, id).await;
+        c.finish(r).await
+    }
+
+    /// Final delete of an object in the trash (ADR 0073), with everything that hangs on it; not part of the trait.
+    ///
+    /// # Errors
+    /// `NotFound`, or `Invalid` when the object is not in the trash.
+    pub async fn delete_final(&self, id: ObjectId) -> Result<()> {
+        let c = self.store.begin().await?;
+        let r = envelope::delete_final(&c, id).await;
+        c.finish(r).await
+    }
+
+    /// The writes of this object are no longer logged (as v4 `unlogged_ids`); not part of the trait.
+    ///
+    /// # Errors
+    /// `NotFound` when there is no such object.
+    pub async fn mark_unlogged(&self, id: ObjectId) -> Result<()> {
+        let c = self.store.begin().await?;
+        let r = envelope::mark_unlogged(&c, id).await;
+        c.finish(r).await
     }
 
     /// The store (the tests look at the rows).
@@ -137,7 +166,7 @@ impl Appointments for LocalAppointments {
             to,
             view_zone,
             calendars,
-            &Attendee::Actor(self.actor.clone()),
+            &self.actor,
         )
         .await
     }

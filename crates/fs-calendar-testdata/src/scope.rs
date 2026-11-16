@@ -25,7 +25,11 @@ pub(crate) fn invalid(field: &str, reason: &str) -> Error {
 }
 
 /// The occurrence `rid` of a series, as wall-clock time.
-pub(crate) fn occurrence(a: &Appointment, rid: LocalDateTime) -> Result<NaiveDateTime> {
+///
+/// # Errors
+/// `Invalid` when the appointment is not a series or `rid` is not one of its occurrences.
+#[allow(clippy::must_use_candidate)]
+pub fn occurrence(a: &Appointment, rid: LocalDateTime) -> Result<NaiveDateTime> {
     if a.recurrence.is_empty() {
         return Err(invalid("scope", "this appointment is not a series"));
     }
@@ -82,7 +86,7 @@ pub(crate) fn commit(
 }
 
 /// Cut the series so the occurrence `at` and all after it are gone; later overrides go too.
-pub(crate) fn truncate(a: &mut Appointment, at: NaiveDateTime) {
+pub fn truncate(a: &mut Appointment, at: NaiveDateTime) {
     let until = RuleEnd::Until(local(at - Duration::seconds(1)));
     for r in &mut a.recurrence {
         r.end = until;
@@ -91,7 +95,7 @@ pub(crate) fn truncate(a: &mut Appointment, at: NaiveDateTime) {
         .retain(|o| naive(o.recurrence_id).is_some_and(|n| n < at));
 }
 
-pub(crate) fn upsert(a: &mut Appointment, o: Override) {
+pub fn upsert(a: &mut Appointment, o: Override) {
     a.overrides.retain(|x| x.recurrence_id != o.recurrence_id);
     a.overrides.push(o);
     a.overrides.sort_by_key(|x| naive(x.recurrence_id));

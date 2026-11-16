@@ -5,6 +5,9 @@
 //! every write path ends in `finish`.
 
 use fs_calendar_testdata::draft::{Error, Result};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use tokio::sync::{Mutex, MutexGuard};
 use turso::{Builder, Connection, Value};
 
@@ -16,12 +19,23 @@ use crate::typed::check_row;
 pub struct Store {
     _db: turso::Database,
     conn: Mutex<Connection>,
+    /// Set when a unit of work was dropped without `finish` (a cancelled future): the next access rolls back first.
+    dirty: Arc<AtomicBool>,
 }
 
 /// The connection for one unit of work.
 pub struct Conn<'a> {
     guard: MutexGuard<'a, Connection>,
     in_tx: bool,
+    dirty: Arc<AtomicBool>,
+}
+
+impl Drop for Conn<'_> {
+    fn drop(&mut self) {
+        if self.in_tx {
+            self.dirty.store(true, Ordering::SeqCst);
+        }
+    }
 }
 
 /// An engine error as the trait's error: a refused constraint is `Invalid`, anything else `Unavailable`.
@@ -29,9 +43,15 @@ pub struct Conn<'a> {
 pub fn engine(e: &turso::Error) -> Error {
     let msg = e.to_string();
     let low = msg.to_lowercase();
-    if ["constraint", "unique", "check", "foreign key", "datatype"]
-        .iter()
-        .any(|w| low.contains(w))
+    if [
+        "constraint failed",
+        "constraint violation",
+        "foreign key",
+        "cannot store",
+        "datatype mismatch",
+    ]
+    .iter()
+    .any(|w| low.contains(w))
     {
         invalid("store", &msg)
     } else {
@@ -56,6 +76,7 @@ impl Store {
         let store = Self {
             _db: db,
             conn: Mutex::new(conn),
+            dirty: Arc::new(AtomicBool::new(false)),
         };
         let c = store.begin().await?;
         let r = crate::registry::bootstrap(&c, now).await;
@@ -63,24 +84,38 @@ impl Store {
         Ok(store)
     }
 
+    /// The connection; a transaction that a cancelled future left open is rolled back first (K1).
+    async fn lock(&self) -> MutexGuard<'_, Connection> {
+        let guard = self.conn.lock().await;
+        if self.dirty.swap(false, Ordering::SeqCst) {
+            let _ = guard.execute("ROLLBACK", ()).await;
+        }
+        guard
+    }
+
     /// Lock the connection and open a transaction (`BEGIN IMMEDIATE`).
     ///
     /// # Errors
     /// `Unavailable` when the engine refuses.
     pub async fn begin(&self) -> Result<Conn<'_>> {
-        let guard = self.conn.lock().await;
+        let guard = self.lock().await;
         guard
             .execute("BEGIN IMMEDIATE", ())
             .await
             .map_err(|e| engine(&e))?;
-        Ok(Conn { guard, in_tx: true })
+        Ok(Conn {
+            guard,
+            in_tx: true,
+            dirty: self.dirty.clone(),
+        })
     }
 
     /// Lock the connection for reading (no transaction).
     pub async fn read(&self) -> Conn<'_> {
         Conn {
-            guard: self.conn.lock().await,
+            guard: self.lock().await,
             in_tx: false,
+            dirty: self.dirty.clone(),
         }
     }
 
@@ -190,10 +225,11 @@ impl Conn<'_> {
     ///
     /// # Errors
     /// The error of `r`, or of the commit.
-    pub async fn finish<T>(self, r: Result<T>) -> Result<T> {
+    pub async fn finish<T>(mut self, r: Result<T>) -> Result<T> {
         if !self.in_tx {
             return r;
         }
+        self.in_tx = false;
         match r {
             Ok(v) => match self.guard.execute("COMMIT", ()).await {
                 Ok(_) => Ok(v),

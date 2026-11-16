@@ -5,7 +5,8 @@
 use std::collections::BTreeMap;
 
 use fs_calendar_testdata::draft::{
-    Alert, Appointment, Attendee, FieldChange, Participant, Trigger, Value as Val, When,
+    Alert, Appointment, AppointmentPatch, Attendee, FieldChange, OverrideChange, Participant,
+    RecurrenceRule, RuleEnd, Trigger, Value as Val, When,
 };
 
 use crate::words::{
@@ -68,7 +69,41 @@ pub fn flatten(a: &Appointment) -> Flat {
     }
     a.participants.iter().for_each(|p| participant(&mut f, p));
     a.alerts.iter().for_each(|x| alert(&mut f, x));
+    for (ex, rules) in [("r", &a.recurrence), ("x", &a.excluded_recurrence)] {
+        rules
+            .iter()
+            .enumerate()
+            .for_each(|(i, r)| rule(&mut f, &format!("{ex}{i}"), r));
+    }
+    for r in &a.related {
+        put(
+            &mut f,
+            "related",
+            Some(&r.uid),
+            text(word(&crate::rules::RELATIONS, r.relation)),
+        );
+    }
     f
+}
+
+fn rule(f: &mut Flat, k: &str, r: &RecurrenceRule) {
+    let k = Some(k);
+    put(f, "rule.frequency", k, text(&format!("{:?}", r.frequency)));
+    put(f, "rule.interval", k, Val::Int(i64::from(r.interval)));
+    match r.end {
+        RuleEnd::Never => {}
+        RuleEnd::Count(n) => put(f, "rule.count", k, Val::Int(i64::from(n))),
+        RuleEnd::Until(l) => put(f, "rule.until", k, Val::Local(l)),
+    }
+    put(
+        f,
+        "rule.by",
+        k,
+        text(&format!(
+            "{:?}{:?}{:?}{:?}",
+            r.by_day, r.by_month_day, r.by_month, r.by_set_position
+        )),
+    );
 }
 
 fn when(f: &mut Flat, w: &When) {
@@ -198,20 +233,52 @@ pub fn diff(old: &Flat, new: &Flat) -> Vec<FieldChange> {
 /// Whether the slice stores everything of this appointment; the first thing it cannot is named.
 #[must_use]
 pub fn unsupported(a: &Appointment) -> Option<&'static str> {
-    let rest: [(&'static str, bool); 10] = [
-        ("recurrence", !a.recurrence.is_empty()),
-        ("excluded_recurrence", !a.excluded_recurrence.is_empty()),
-        ("overrides", !a.overrides.is_empty()),
-        ("locations", !a.locations.is_empty()),
-        ("virtual_locations", !a.virtual_locations.is_empty()),
-        ("links", !a.links.is_empty()),
+    let moved = |f: &dyn Fn(&AppointmentPatch) -> bool| {
+        a.overrides
+            .iter()
+            .any(|o| matches!(&o.change, OverrideChange::Changed(p) if f(p)))
+    };
+    let rest: [(&'static str, bool); 8] = [
+        (
+            "locations",
+            !a.locations.is_empty()
+                || moved(&|p| p.locations.as_ref().is_some_and(|l| !l.is_empty())),
+        ),
+        (
+            "virtual_locations",
+            !a.virtual_locations.is_empty()
+                || moved(&|p| p.virtual_locations.as_ref().is_some_and(|l| !l.is_empty())),
+        ),
+        (
+            "links",
+            !a.links.is_empty() || moved(&|p| p.links.as_ref().is_some_and(|l| !l.is_empty())),
+        ),
         ("reply_to", !a.reply_to.is_empty()),
-        ("related", !a.related.is_empty()),
-        ("localizations", !a.localizations.is_empty()),
+        (
+            "localizations",
+            !a.localizations.is_empty()
+                || moved(&|p| p.localizations.as_ref().is_some_and(|l| !l.is_empty())),
+        ),
         (
             "participants.send_to_or_delegation",
             a.participants.iter().any(|p| {
                 !p.send_to.is_empty() || !p.delegated_to.is_empty() || !p.delegated_from.is_empty()
+            }),
+        ),
+        (
+            "overrides.recurrence",
+            moved(&|p| p.recurrence.is_some() || p.excluded_recurrence.is_some()),
+        ),
+        (
+            "overrides.participants.send_to_or_delegation",
+            moved(&|p| {
+                p.participants.as_ref().is_some_and(|l| {
+                    l.iter().any(|x| {
+                        !x.send_to.is_empty()
+                            || !x.delegated_to.is_empty()
+                            || !x.delegated_from.is_empty()
+                    })
+                })
             }),
         ),
     ];

@@ -15,20 +15,13 @@ use crate::codec::{id_text, id_value, invalid, person_of, text};
 use crate::envelope::{bump, insert, log, trash, untrash};
 use crate::fields::{diff, flatten};
 use crate::read::{Rd, load};
+use crate::scope_delete::{delete_partial, restore_partial};
+use crate::scope_ops::{update_following, update_this};
 use crate::store::Conn;
 use crate::write::{validate, write_appointment, write_collection};
 use fs_calendar_testdata::draft::{FieldChange, Value as Val};
-
-/// What the slice offers of a scope: the whole appointment only (series come with core step 2).
-fn whole(scope: SeriesScope, capability: &str) -> Result<()> {
-    match scope {
-        SeriesScope::Whole => Ok(()),
-        _ => Err(Error::Unsupported {
-            capability: capability.to_owned(),
-            reason: "series scopes come with core step 2".to_owned(),
-        }),
-    }
-}
+use fs_calendar_testdata::instances::series_start;
+use fs_calendar_testdata::zone::naive;
 
 async fn calendar_exists(c: &Conn<'_>, id: ObjectId) -> Result<bool> {
     let r = c.query("SELECT 1 FROM calendar_collection k JOIN objects o ON o.id = k.id WHERE k.id = ? AND o.deleted IS NULL", vec![id_value(id)]).await?;
@@ -101,6 +94,13 @@ async fn create_calendar_in(
 ) -> Result<CalendarInfo> {
     if name.trim().is_empty() {
         return Err(invalid("name", "must not be empty"));
+    }
+    if zone.as_ref().is_some_and(crate::write::custom) {
+        return Err(Error::Unsupported {
+            capability: "calendar.create".to_owned(),
+            reason: "custom zones are not stored yet (the calendar_custom_zone tables are missing)"
+                .to_owned(),
+        });
     }
     let id = new_id(now);
     insert(c, id, "Calendar", name, owner, now).await?;
@@ -195,7 +195,19 @@ pub async fn update(
     scope: SeriesScope,
 ) -> Result<Appointment> {
     let r = async {
-        whole(scope, "event.update")?;
+        match scope {
+            SeriesScope::This { recurrence_id } => {
+                return update_this(&c, actor, now, id, expected, &p, recurrence_id).await;
+            }
+            SeriesScope::ThisAndFollowing { recurrence_id } => {
+                let l = must_load(&c, id).await?;
+                let first = series_start(&l.appt.when).zip(naive(recurrence_id));
+                if first.is_none_or(|(s, r)| s != r) {
+                    return update_following(&c, actor, now, id, expected, &p, recurrence_id).await;
+                }
+            }
+            SeriesScope::Whole => {}
+        }
         let old = must_load(&c, id).await?;
         if old.deleted.is_some() {
             return Err(Error::NotFound(id));
@@ -243,7 +255,9 @@ pub async fn delete(
     scope: SeriesScope,
 ) -> Result<Deleted> {
     let r = async {
-        whole(scope, "event.delete")?;
+        if !matches!(scope, SeriesScope::Whole) {
+            return delete_partial(&c, actor, now, id, expected, scope).await;
+        }
         let old = must_load(&c, id).await?;
         if old.deleted.is_some() {
             return Err(Error::NotFound(id));
@@ -272,8 +286,10 @@ pub async fn restore(
     scope: SeriesScope,
 ) -> Result<Appointment> {
     let r = async {
-        whole(scope, "event.restore")?;
-        must_load(&c, id).await?;
+        let l = must_load(&c, id).await?;
+        if l.deleted.is_none() {
+            return restore_partial(&c, actor, now, l.appt, scope).await;
+        }
         untrash(&c, id, now).await?;
         log(&c, id, HistoryKind::Undo, actor, now, &[]).await?;
         Ok(must_load(&c, id).await?.appt)

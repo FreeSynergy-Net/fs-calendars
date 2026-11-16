@@ -6,9 +6,9 @@
 mod common;
 
 use common::fx;
-use fs_calendar_local::fields::unsupported;
 use fs_calendar_testdata::draft::{
-    Appointment, AppointmentDraft, AppointmentPatch, Appointments, Error, ObjectId,
+    Appointment, AppointmentDraft, AppointmentPatch, Appointments, Error, ObjectId, OverrideChange,
+    SeriesScope,
 };
 use fs_calendar_testdata::sample::sample;
 
@@ -56,52 +56,66 @@ async fn every_sample_appointment_is_stored_equal_or_refused_by_name() {
     let (mut stored, mut refused) = (Vec::new(), Vec::new());
     for (slug, a) in sample().appointments {
         let mut want = a.clone();
-        want.overrides.clear();
-        want.related.clear();
         want.reply_to.clear();
         want.origin = None;
-        match f.p.create(draft_of(&want, f.cal)).await {
-            Ok(got) => {
-                assert_eq!(
-                    unsupported(&want),
-                    None,
-                    "{slug}: stored although it has a part the slice cannot store"
-                );
-                let mut e = sorted(want);
-                (
-                    e.id, e.calendar, e.revision, e.created, e.updated, e.sequence,
-                ) = (
-                    got.id,
-                    got.calendar,
-                    got.revision,
-                    got.created,
-                    got.updated,
-                    got.sequence,
-                );
-                assert_eq!(sorted(got.clone()), e, "{slug}");
-                assert_eq!(
-                    sorted(f.p.get_by_uid(&a.uid).await.unwrap().unwrap()),
-                    e,
-                    "{slug} read back"
-                );
-                stored.push(slug);
+        let created = match f.p.create(draft_of(&want, f.cal)).await {
+            Ok(g) => g,
+            Err(e) => {
+                refused.push((slug, e));
+                continue;
             }
-            Err(Error::Unsupported { .. } | Error::UnknownZone(_)) => refused.push(slug),
-            Err(e) => panic!("{slug}: {e:?}"),
+        };
+        // Exceptions come in through the scopes, as a program would write them.
+        let mut got = created;
+        for o in &a.overrides {
+            let rid = o.recurrence_id;
+            let scope = SeriesScope::This { recurrence_id: rid };
+            match &o.change {
+                OverrideChange::Excluded => {
+                    f.p.delete(got.id, got.revision, scope).await.unwrap();
+                }
+                OverrideChange::Changed(p) => {
+                    f.p.update(got.id, got.revision, p.clone(), scope)
+                        .await
+                        .unwrap();
+                }
+            }
+            got = f.p.get(got.id).await.unwrap().unwrap();
+        }
+        let mut e = sorted(want);
+        (
+            e.id, e.calendar, e.revision, e.created, e.updated, e.sequence,
+        ) = (
+            got.id,
+            got.calendar,
+            got.revision,
+            got.created,
+            got.updated,
+            got.sequence,
+        );
+        assert_eq!(sorted(got.clone()), e, "{slug}");
+        assert_eq!(
+            sorted(f.p.get_by_uid(&a.uid).await.unwrap().unwrap()),
+            e,
+            "{slug} read back"
+        );
+        stored.push(slug);
+    }
+    let names: Vec<&str> = refused.iter().map(|(s, _)| *s).collect();
+    assert_eq!(
+        names,
+        ["custom-zone", "invitation"],
+        "exactly these are refused"
+    );
+    for (slug, e) in &refused {
+        match e {
+            Error::Unsupported { capability, reason } => {
+                assert_eq!(capability, "event.create", "{slug}");
+                println!("{slug}: {reason}");
+            }
+            other => panic!("{slug}: expected Unsupported, got {other:?}"),
         }
     }
-    println!(
-        "stored {}: {stored:?}\nrefused {}: {refused:?}",
-        stored.len(),
-        refused.len()
-    );
-    assert!(
-        stored.len() >= 20,
-        "the single cases and the busy day are stored"
-    );
-    assert!(refused.iter().all(|s| !s.starts_with("busy-day")));
-    assert_eq!(
-        f.count("calendar_appointment").await,
-        i64::try_from(stored.len()).unwrap()
-    );
+    assert_eq!(stored.len(), 43);
+    assert!(f.count("calendar_appointment").await >= 43);
 }

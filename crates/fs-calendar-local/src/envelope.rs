@@ -10,7 +10,9 @@ use turso::Value;
 
 use crate::change_codec::encode;
 use crate::clock::new_id;
-use crate::codec::{get_int, get_opt_int, id_text, id_value, int, opt_text, person_values, text};
+use crate::codec::{
+    get_int, get_opt_int, get_text, id_text, id_value, int, opt_text, person_values, text,
+};
 use crate::object_tables::{ACTIVITY, ACTIVITY_CHANGE, OBJECTS};
 use crate::store::Conn;
 use crate::words::{HISTORY_KIND, word};
@@ -179,6 +181,15 @@ pub async fn log(
     now: i64,
     changes: &[FieldChange],
 ) -> Result<()> {
+    let unlogged = c
+        .query(
+            "SELECT 1 FROM unlogged_ids WHERE object_id = ?",
+            vec![id_value(id)],
+        )
+        .await?;
+    if !unlogged.is_empty() {
+        return Ok(());
+    }
     let aid = id_text(new_id(now));
     let [pid, part, pabzug] = person_values(actor);
     let kind_word = word(&HISTORY_KIND, kind);
@@ -216,5 +227,64 @@ pub async fn log(
         row.extend(new);
         c.insert(&ACTIVITY_CHANGE, row).await?;
     }
+    c.exec("INSERT INTO meta (key, value) VALUES ('activity_high', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", vec![text(&aid)]).await?;
+    Ok(())
+}
+
+/// Log purge (ADR 0029): remove the log of an object, keep the object, remember the id in `purged_objects`.
+///
+/// # Errors
+/// `NotFound` when there is no such object.
+pub async fn purge_log(c: &Conn<'_>, id: ObjectId) -> Result<()> {
+    state(c, id).await?.ok_or(Error::NotFound(id))?;
+    c.exec("DELETE FROM activity WHERE object = ?", vec![id_value(id)])
+        .await?;
+    c.exec(
+        "INSERT INTO purged_objects (object_id) VALUES (?) ON CONFLICT (object_id) DO NOTHING",
+        vec![id_value(id)],
+    )
+    .await?;
+    Ok(())
+}
+
+/// From now on the writes of this object are not logged (as v4 `unlogged_ids`).
+///
+/// # Errors
+/// `NotFound` when there is no such object.
+pub async fn mark_unlogged(c: &Conn<'_>, id: ObjectId) -> Result<()> {
+    state(c, id).await?.ok_or(Error::NotFound(id))?;
+    c.exec(
+        "INSERT INTO unlogged_ids (object_id) VALUES (?) ON CONFLICT (object_id) DO NOTHING",
+        vec![id_value(id)],
+    )
+    .await?;
+    Ok(())
+}
+
+/// Final delete (end of the trash, ADR 0073): the object leaves with every row and its log. Only for an object in the
+/// trash; the envelopes of the exceptions of a series go with it.
+///
+/// # Errors
+/// `NotFound`, or `Invalid` when the object is not in the trash.
+pub async fn delete_final(c: &Conn<'_>, id: ObjectId) -> Result<()> {
+    let s = state(c, id).await?.ok_or(Error::NotFound(id))?;
+    if s.deleted.is_none() {
+        return Err(crate::codec::invalid("id", "not in the trash"));
+    }
+    let ex = c
+        .query(
+            "SELECT id FROM calendar_appointment WHERE master = ?",
+            vec![id_value(id)],
+        )
+        .await?;
+    for r in &ex {
+        c.exec(
+            "DELETE FROM objects WHERE id = ?",
+            vec![Value::Text(get_text(r, 0)?)],
+        )
+        .await?;
+    }
+    c.exec("DELETE FROM objects WHERE id = ?", vec![id_value(id)])
+        .await?;
     Ok(())
 }

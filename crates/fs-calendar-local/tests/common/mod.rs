@@ -1,6 +1,8 @@
 //! Helpers shared by the tests of `LocalAppointments`.
 #![allow(dead_code)]
 
+pub mod series;
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 

@@ -5,12 +5,11 @@
 mod common;
 
 use common::{fx, ms, utc};
-use fs_calendar_testdata::draft::Frequency;
 use fs_calendar_testdata::draft::{
     AppointmentPatch, AppointmentQuery, Appointments, BasicValue, Error, LocalDateTime, Location,
     SeriesScope,
 };
-use fs_calendar_testdata::sample::{all_day, at, rule, timed};
+use fs_calendar_testdata::sample::{all_day, at, timed};
 use fs_calendar_testdata::zone::iana;
 
 #[tokio::test]
@@ -105,7 +104,15 @@ async fn parts_that_are_not_stored_yet_are_refused_never_dropped() {
     let f = fx().await;
     let rows = f.count("objects").await;
     let mut series = f.draft("Serie", timed(at(2026, 11, 20, 9, 0), "Europe/Berlin", 30));
-    series.rest.recurrence = Some(vec![rule(Frequency::Weekly)]);
+    series.rest.links = Some(vec![fs_calendar_testdata::draft::Link {
+        key: "l".into(),
+        href: Some("https://example.org".into()),
+        file: None,
+        content_type: None,
+        size: None,
+        rel: None,
+        title: None,
+    }]);
     let mut place = f.draft("Ort", timed(at(2026, 11, 20, 9, 0), "Europe/Berlin", 30));
     place.rest.locations = Some(vec![Location {
         key: "l".into(),
@@ -129,14 +136,17 @@ async fn parts_that_are_not_stored_yet_are_refused_never_dropped() {
     let this = SeriesScope::This {
         recurrence_id: LocalDateTime::parse("2026-11-02T09:00:00").unwrap(),
     };
-    assert!(matches!(
-        f.p.update(a.id, a.revision, AppointmentPatch::default(), this)
-            .await,
-        Err(Error::Unsupported { .. })
-    ));
+    assert!(
+        matches!(
+            f.p.update(a.id, a.revision, AppointmentPatch::default(), this)
+                .await,
+            Err(Error::Invalid(_))
+        ),
+        "not a series"
+    );
     assert!(matches!(
         f.p.delete(a.id, a.revision, this).await,
-        Err(Error::Unsupported { .. })
+        Err(Error::Invalid(_))
     ));
     assert!(
         matches!(
@@ -161,7 +171,6 @@ async fn capabilities_say_what_this_slice_offers() {
         [
             "calendar.read",
             "calendar.create",
-            "event.read",
             "event.create",
             "event.update",
             "event.delete",

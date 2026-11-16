@@ -7,203 +7,66 @@ use std::collections::{BTreeSet, HashMap};
 
 use fs_calendar_testdata::check;
 use fs_calendar_testdata::draft::{
-    Alert, Appointment, Attendee, Error, ObjectId, Participant, PersonRef, Result, Trigger, When,
-    Zone,
+    Appointment, Error, ObjectId, OverrideChange, PersonRef, Result, When, Zone, ZoneKind,
 };
-use fs_calendar_testdata::zone::{bounds, iana};
-use turso::Value;
 
 use crate::calendar_tables::{ALERT, APPOINTMENT, CATEGORY, COLLECTION, KEYWORD, PARTICIPANT};
-use crate::codec::{
-    boolean, date_to_int, id_value, int, local_to_int, opt_int, opt_text, person_values, text,
-};
+use crate::codec::{id_value, opt_text, person_values, text};
 use crate::fields::unsupported;
+use crate::row_values::{Link, alert_values, appointment_values, participant_values};
 use crate::store::Conn;
-use crate::words::{
-    ALERT_ACTION, FREE_BUSY, PARTICIPATION, PRIVACY, RELATIVE_TO, STATUS, TEXT_TYPE, word,
-};
 
-/// Largest zone offset the hull allows for (draft section 2.3).
-const HULL_PAD_MS: i64 = 16 * 3_600_000;
+/// Whether a zone is a custom one (`/...`).
+pub fn custom(z: &Zone) -> bool {
+    z.kind() == ZoneKind::Custom
+}
 
-/// Check everything before anything is written: the pilot's checks, then what this slice cannot store.
+fn custom_when(w: &When) -> bool {
+    matches!(w, When::Timed { zone, end_zone, .. } if custom(zone) || end_zone.as_ref().is_some_and(custom))
+}
+
+/// Check everything before anything is written: custom zones and parts not stored yet are `Unsupported`, then the
+/// pilot's checks.
 ///
 /// # Errors
-/// `Invalid`/`UnknownZone` from the checks; `Unsupported` for a part that is not stored yet (never dropped quietly).
+/// `Unsupported` for a part that is not stored yet (never dropped quietly); `Invalid`/`UnknownZone` from the checks.
 pub fn validate(a: &Appointment, capability: &str) -> Result<()> {
-    check::appointment(a, &HashMap::new())?;
-    match unsupported(a) {
-        Some(part) => Err(Error::Unsupported {
+    let no = |reason: String| {
+        Err(Error::Unsupported {
             capability: capability.to_owned(),
-            reason: format!("{part} is not stored yet (core step 1b)"),
-        }),
-        None => Ok(()),
+            reason,
+        })
+    };
+    let moved = a.overrides.iter().any(|o| matches!(&o.change, OverrideChange::Changed(p) if p.when.as_ref().is_some_and(custom_when)));
+    if custom_when(&a.when) || moved {
+        return no(
+            "custom zones are not stored yet (the calendar_custom_zone tables are missing)"
+                .to_owned(),
+        );
     }
+    if let Some(part) = unsupported(a) {
+        return no(format!("{part} is not stored yet"));
+    }
+    check::appointment(a, &HashMap::new())
 }
 
-/// The hull `(utc_min, utc_max)` in ms: exact for a timed one, widened by 16 h for floating and all-day (R11).
-///
-/// # Errors
-/// `UnknownZone`, or `Invalid` for a time that does not exist.
-pub fn hull(w: &When) -> Result<(i64, i64)> {
-    let (s, e) = bounds(w, &HashMap::new(), &iana("UTC"))?;
-    Ok(match w {
-        When::Timed { .. } => (s.millis(), e.millis()),
-        _ => (s.millis() - HULL_PAD_MS, e.millis() + HULL_PAD_MS),
-    })
-}
-
-fn when_values(w: &When) -> Result<Vec<Value>> {
-    let zone = |z: &Zone| text(z.id());
-    Ok(match w {
-        When::Timed {
-            start,
-            zone: z,
-            length,
-            end_zone,
-            zone_assumed,
-        } => vec![
-            text("timed"),
-            int(local_to_int(*start)?),
-            Value::Null,
-            zone(z),
-            end_zone.as_ref().map_or(Value::Null, zone),
-            boolean(*zone_assumed),
-            int(i64::from(length.days)),
-            int(i64::from(length.seconds)),
-        ],
-        When::Floating { start, length } => vec![
-            text("floating"),
-            int(local_to_int(*start)?),
-            Value::Null,
-            Value::Null,
-            Value::Null,
-            boolean(false),
-            int(i64::from(length.days)),
-            int(i64::from(length.seconds)),
-        ],
-        When::AllDay { first, days } => vec![
-            text("all_day"),
-            Value::Null,
-            int(date_to_int(*first)?),
-            Value::Null,
-            Value::Null,
-            boolean(false),
-            int(i64::from(*days)),
-            int(0),
-        ],
-    })
-}
-
-fn appointment_values(a: &Appointment) -> Result<Vec<Value>> {
-    let (min, max) = hull(&a.when)?;
-    let mut v = vec![
-        id_value(a.id),
-        id_value(a.calendar),
-        text(&a.uid),
-        Value::Null,
-        Value::Null,
-        boolean(false),
-        int(i64::from(a.sequence)),
-        int(a.created.millis()),
-        int(a.updated.millis()),
-        text(&a.title),
-        text(&a.description),
-        text(word(&TEXT_TYPE, a.description_type)),
-        opt_text(a.locale.as_deref()),
-    ];
-    v.extend(when_values(&a.when)?);
-    v.extend([
-        int(min),
-        int(max),
-        text(word(&STATUS, a.status)),
-        text(word(&FREE_BUSY, a.free_busy)),
-        text(word(&PRIVACY, a.privacy)),
-        int(i64::from(a.priority)),
-        opt_text(a.color.as_deref()),
-    ]);
-    v.extend([
-        boolean(a.use_default_alerts),
-        boolean(a.hide_attendees),
-        boolean(a.may_invite_self),
-        boolean(a.may_invite_others),
-    ]);
-    Ok(v)
-}
-
-fn participant_values(id: ObjectId, p: &Participant) -> Vec<Value> {
-    let (kind, who, art, abzug) = match &p.who {
-        Attendee::Actor(r) => {
-            let [i, a, z] = person_values(r);
-            ("actor", i, a, z)
-        }
-        Attendee::Resource(r) => (
-            "resource",
-            text(&fs_calendar_testdata::draft::BasicValue::canonical(r)),
-            Value::Null,
-            Value::Null,
-        ),
-        Attendee::Location(r) => (
-            "location",
-            text(&fs_calendar_testdata::draft::BasicValue::canonical(r)),
-            Value::Null,
-            Value::Null,
-        ),
-    };
-    let r = p.roles;
-    vec![
-        id_value(id),
-        text(&p.key),
-        text(kind),
-        who,
-        art,
-        abzug,
-        boolean(r.owner),
-        boolean(r.attendee),
-        boolean(r.optional),
-        boolean(r.informational),
-        boolean(r.chair),
-        boolean(r.contact),
-        text(word(&PARTICIPATION, p.status)),
-        boolean(p.expect_reply),
-        opt_text(p.comment.as_deref()),
-        opt_text(p.invited_by.as_deref()),
-        int(i64::from(p.schedule_sequence)),
-        opt_int(p.schedule_updated.map(|u| u.millis())),
-    ]
-}
-
-fn alert_values(id: ObjectId, a: &Alert) -> Vec<Value> {
-    let (kind, secs, rel, at) = match a.trigger {
-        Trigger::Offset {
-            seconds,
-            relative_to,
-        } => (
-            "offset",
-            int(seconds),
-            text(word(&RELATIVE_TO, relative_to)),
-            Value::Null,
-        ),
-        Trigger::Absolute { at } => ("absolute", Value::Null, Value::Null, int(at.millis())),
-    };
-    vec![
-        id_value(id),
-        text(&a.key),
-        text(kind),
-        secs,
-        rel,
-        at,
-        text(word(&ALERT_ACTION, a.action)),
-        opt_int(a.acknowledged.map(|u| u.millis())),
-    ]
-}
-
-/// Write the appointment row and replace its child rows. The envelope row must exist already.
+/// Write a master: the row, the child rows, the rules and `related`. The envelope row must exist already.
 ///
 /// # Errors
 /// `Invalid` naming `table.column`, `UnknownZone`, or the engine's error.
 pub async fn write_appointment(c: &Conn<'_>, a: &Appointment) -> Result<()> {
-    c.upsert(&APPOINTMENT, &["id"], appointment_values(a)?)
+    write_row(c, a, None).await?;
+    crate::rules::write_rules(c, a.id, false, &a.recurrence).await?;
+    crate::rules::write_rules(c, a.id, true, &a.excluded_recurrence).await?;
+    crate::rules::write_related(c, a.id, &a.related).await
+}
+
+/// Write the row and the child rows of an appointment or of an exception (`link`).
+///
+/// # Errors
+/// `Invalid` naming `table.column`, `UnknownZone`, or the engine's error.
+pub async fn write_row(c: &Conn<'_>, a: &Appointment, link: Option<Link>) -> Result<()> {
+    c.upsert(&APPOINTMENT, &["id"], appointment_values(a, link)?)
         .await?;
     let id = id_value(a.id);
     for t in [

@@ -1,7 +1,7 @@
 //! The domain tables `calendar_*` of this slice (plan section 2.1 with the draft's `WHEN` composite, section 2.3).
 //!
-//! Pattern: Value Object (const table specifications). Not in this slice: rules, rule parts, exceptions, channels,
-//! delegations, `reply_to`, locations, virtual locations, links, related, localizations, custom zones, alert fire times.
+//! Pattern: Value Object (const table specifications). Not stored yet: channels, delegations, `reply_to`, locations,
+//! virtual locations, links, localizations, custom zones, alert fire times.
 
 use crate::object_tables::{ART, WHO_KINDS};
 use crate::spec::{
@@ -11,7 +11,7 @@ use crate::spec::{
 };
 
 pub const PREFIX: &str = "calendar";
-pub const VERSION: i64 = 1;
+pub const VERSION: i64 = 2;
 pub const STATUS: &[&str] = &["confirmed", "tentative", "cancelled"];
 pub const FREE_BUSY: &[&str] = &["busy", "free"];
 pub const PRIVACY: &[&str] = &["public", "private", "secret"];
@@ -27,7 +27,6 @@ pub const PARTICIPATION: &[&str] = &[
 pub const TRIGGER: &[&str] = &["offset", "absolute"];
 pub const RELATIVE_TO: &[&str] = &["start", "end"];
 pub const ALERT_ACTION: &[&str] = &["display", "email"];
-
 pub const COLLECTION: Table = Table {
     name: "calendar_collection",
     cols: &[
@@ -84,6 +83,9 @@ pub const APPOINTMENT: Table = Table {
         Col::req("hide_attendees", Bool),
         Col::req("may_invite_self", Bool),
         Col::req("may_invite_others", Bool),
+        Col::derived("series_end_utc", Utc, true),
+        Col::derived("search_text", Text, false),
+        Col::opt("hidden_by", Local),
     ],
     constraints: &[
         "PRIMARY KEY (id)",
@@ -100,7 +102,7 @@ pub const APPOINTMENT: Table = Table {
         "CREATE UNIQUE INDEX IF NOT EXISTS calendar_appointment_uid ON calendar_appointment (uid) WHERE master IS NULL",
         "CREATE UNIQUE INDEX IF NOT EXISTS calendar_appointment_exception ON calendar_appointment (master, recurrence_id) WHERE master IS NOT NULL",
         "CREATE INDEX IF NOT EXISTS calendar_appointment_start ON calendar_appointment (collection, when_utc_min)",
-        "CREATE INDEX IF NOT EXISTS calendar_appointment_hull ON calendar_appointment (when_utc_min, when_utc_max)",
+        "CREATE INDEX IF NOT EXISTS calendar_appointment_hull ON calendar_appointment (when_utc_min, series_end_utc)",
     ],
 };
 
@@ -175,12 +177,20 @@ const fn value_table(name: &'static str) -> Table {
     }
 }
 
+pub use crate::series_tables::{CUT, CUT_RULE, OVERRIDE, RELATED, RULE, RULE_PART};
+
 /// All tables of the domain, parents first.
-pub const ALL: [Table; 6] = [
+pub const ALL: [Table; 12] = [
     COLLECTION,
     APPOINTMENT,
     PARTICIPANT,
     ALERT,
     KEYWORD,
     CATEGORY,
+    RULE,
+    RULE_PART,
+    OVERRIDE,
+    RELATED,
+    CUT,
+    CUT_RULE,
 ];
