@@ -58,6 +58,7 @@ pub trait Exchange: Send + Sync {
     /// Was der Anbieter je Medientyp kann.
     fn formats(&self) -> Vec<FormatSupport>;
     /// `exchange.import`; eine unbekannte oder eigene Zone wird ersetzt (`zone_assumed`, `Loss`), nie geraten.
+    /// Fehler des Verzeichnisses (auch `Forbidden` für eine KI: `person.find`, `person.propose`) bricht den ganzen Import ab und wird durchgereicht; nie still als unbekannte Adresse behandeln, nie ohne Personen importieren.
     async fn import(&self, source: FileRef, as_type: &MediaType, ctx: &ImportContext) -> Result<ImportReport>;
     /// `exchange.export`: Ziel = Quelle und unverändert = Original Byte für Byte; Ziel = Quelle, nur
     /// `zone_assumed`-Zeit unangetastet = wieder schwebend; sonst mit Zone (Rundlauf-Regel ADR 0085).
