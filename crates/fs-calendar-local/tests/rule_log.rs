@@ -1,6 +1,12 @@
 //! ADR 0086: the log of a rule change is typed and complete (every part of the rule), no debug text.
 
-#![allow(clippy::many_single_char_names, clippy::assert_is_empty)]
+#![allow(
+    clippy::many_single_char_names,
+    clippy::assert_is_empty,
+    clippy::too_many_lines,
+    clippy::type_complexity,
+    clippy::semicolon_if_nothing_returned
+)]
 
 mod common;
 
