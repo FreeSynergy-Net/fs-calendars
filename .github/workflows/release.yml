@@ -14,7 +14,7 @@ jobs:
       cargo-package: fs-calendars
       name: fs-calendars
       kind: app
-      app-id: net.freesynergy.Calendar
+      app-id: net.freesynergy.Calendars
       macos: false
       windows-targets: ""   # Unix sockets and Unix paths for now
     secrets:
