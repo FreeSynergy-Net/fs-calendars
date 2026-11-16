@@ -2,7 +2,12 @@
 //!
 //! Pattern: Registry (a program reports its table family once; the layer creates the tables, writes them down and
 //! runs the steps that are missing). The calendar has two steps, both `Create`; a later change is a new step appended, with
-//! a fixture test (ADR 0086).
+//! a fixture test (ADR 0086: `tests/migration_step2.rs`).
+//!
+//! Known limit of step 2: a store of Stand 1 gets no `calendar_rule_original` row for a rule that Stand 1 only marked
+//! as unread (`calendar_unread`): such a series reads as without a rule here and its rule cannot be edited (the mark
+//! keeps the refusal); the export is not affected, it comes from `object_original`. No migration fills the rows:
+//! Stand 1 never left the working branch, there is no file in use that has them.
 
 use fs_objects::v5::Step;
 use fs_objects::v5::envelope::Child;

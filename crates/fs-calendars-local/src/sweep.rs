@@ -2,11 +2,17 @@
 //! an expired cut means: the exceptions that a `ThisAndFollowing` cut hid go, a changed occurrence that a `This` cut
 //! deleted loses its fields (a plain `Excluded`) and the changed values leave the log.
 //!
+//! A retention (`hold`) of an appointment keeps its trashed calendar too (the trait rule "a retention goes before the
+//! period"): the layer's `due` looks only at the calendar's own retention and would take the appointments along, so the
+//! run first puts a temporary retention on such a calendar and its trashed appointments and takes it off afterwards
+//! (the same transaction; nothing of it is visible outside).
+//!
 //! Pattern: Template method (the layer owns the loop and the final delete of the trash; the hook is the calendar's
 //! part), plus an Adapter for the counts.
 
 use fs_calendars_testdata::draft::{LocalDateTime, ObjectId, PersonRef, Result};
 use fs_objects::v5;
+use fs_objects::v5::hold;
 use fs_objects::v5::log::redact;
 use fs_objects::v5::purge::{Done, HookFuture};
 use fs_types as ft;
@@ -37,15 +43,68 @@ pub struct Swept {
 /// # Errors
 /// The engine's error.
 pub async fn sweep_expired(c: &Conn<'_>, now: i64, actor: &PersonRef) -> Result<Swept> {
+    let guarded = guard_kept(c, now).await?;
     let done = v5::purge::sweep(c.inner(), &DOMAIN, now, actor)
         .await
         .map_err(adapt)?;
+    unguard(c, guarded).await?;
     Ok(Swept {
         cuts: done.rows.iter().map(|(_, n)| *n).sum(),
         hidden: done.changed_of(HIDDEN),
         scrubbed: done.changed_of(SCRUBBED),
         objects: done.objects,
     })
+}
+
+/// What a temporary retention replaced: the object and its own retention before (`None` = none).
+type Guarded = Vec<(ObjectId, Option<Option<i64>>)>;
+
+/// Trashed calendars whose period is over but that keep an appointment longer: they and their trashed appointments
+/// get the latest end of those retentions (`None` = without end) until the run is done.
+async fn guard_kept(c: &Conn<'_>, now: i64) -> Result<Guarded> {
+    let due = c
+        .query(
+            "SELECT k.id FROM calendar_collection k JOIN objects o ON o.id = k.id WHERE o.deleted IS NOT NULL \
+             AND o.purge_after IS NOT NULL AND o.purge_after <= ?",
+            vec![int(now)],
+        )
+        .await?;
+    let mut done = Guarded::new();
+    for row in &due {
+        let ids = crate::calendar_ops::kept_by(c, get_id(row, 0)?).await?;
+        let mut latest: Option<Option<i64>> = None;
+        for id in &ids[1..] {
+            match hold::held_until(c.inner(), *id).await.map_err(adapt)? {
+                Some(None) => latest = Some(None),
+                Some(Some(t)) if t > now && latest != Some(None) => {
+                    latest = Some(Some(latest.flatten().map_or(t, |b: i64| b.max(t))));
+                }
+                _ => {}
+            }
+        }
+        let Some(until) = latest else { continue };
+        for id in ids {
+            let before = hold::held_until(c.inner(), id).await.map_err(adapt)?;
+            if hold::is_held(c.inner(), id, now).await.map_err(adapt)? {
+                continue;
+            }
+            hold::hold(c.inner(), id, until).await.map_err(adapt)?;
+            done.push((id, before));
+        }
+    }
+    Ok(done)
+}
+
+/// Put the retentions back as they were before the run.
+async fn unguard(c: &Conn<'_>, guarded: Guarded) -> Result<()> {
+    for (id, before) in guarded {
+        match before {
+            Some(until) => hold::hold(c.inner(), id, until).await,
+            None => hold::release(c.inner(), id).await,
+        }
+        .map_err(adapt)?;
+    }
+    Ok(())
 }
 
 /// The kinds the hook reports (`Swept::changed` of the layer).

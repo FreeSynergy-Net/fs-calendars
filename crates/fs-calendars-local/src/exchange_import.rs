@@ -61,6 +61,9 @@ impl LocalExchange {
                     // The first hit of the directory is the person; an unknown address is a proposal in ONE batch of
                     // this import (origin = the file). A failure of the directory (also `Forbidden` for an AI)
                     // aborts the whole import: never silently an unknown address, never an import without people.
+                    // Known limit: if the directory fails only AFTER the first proposals, the batch they opened stays
+                    // in the directory (the `Directory` trait has no way to discard a batch); the proposals are only
+                    // "proposed", nobody confirmed them, and the people can reject the batch there.
                     let found = self.people.find_by_address(&address).await?;
                     Attendee::Actor(if let Some(r) = found.into_iter().next() {
                         r

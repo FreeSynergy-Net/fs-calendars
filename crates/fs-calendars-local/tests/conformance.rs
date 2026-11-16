@@ -74,6 +74,10 @@ async fn the_local_provider_passes_the_rules_it_offers() {
     );
     assert!(report.checked >= 70, "only {} checks ran", report.checked);
     let skipped = report.skipped.join(" | ");
+    assert!(
+        !skipped.contains("deadline") && !skipped.contains("period"),
+        "the deadline rules must run, not be skipped: {skipped}"
+    );
     for part in ["subscriptions", "free_busy", "no AI account"] {
         assert!(
             skipped.contains(part),

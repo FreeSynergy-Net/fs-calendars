@@ -42,7 +42,10 @@ pub async fn create(
     now: i64,
     d: AppointmentDraft,
 ) -> Result<Appointment> {
-    let r = create_in(&c, actor, now, d).await;
+    let r = match crate::origin::refuse_original_on_create(&d.rest) {
+        Ok(()) => create_in(&c, actor, now, d).await,
+        Err(e) => Err(e),
+    };
     c.finish(r).await
 }
 

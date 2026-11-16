@@ -5,8 +5,8 @@
 //! computed (`rev = rev_at_import`), never stored (ADR 0085).
 
 use fs_calendars_testdata::draft::{
-    FileRef, LocalDateTime, MediaType, ObjectId, Origin, OriginChannel, Reference, Result,
-    Revision, Utc,
+    FileRef, LocalDateTime, MediaType, ObjectId, Origin, OriginChannel, Recurrence, Reference,
+    Result, Revision, Utc,
 };
 use fs_objects::v5::original as layer;
 
@@ -174,6 +174,12 @@ pub async fn refuse_rule_edit(
     // The start is part of it: the kept `EXDATE` and exceptions point at the old times. Giving back the rules as they
     // are is no edit (R1: the original rule travels with the appointment).
     let (rules, excluded) = crate::rules::read_rules(c, id).await?;
+    // A rule kept as written is received, never made: a new `Original` is refused, the stored one may be given back.
+    if made_original(p.recurrence.as_deref(), &rules)
+        || made_original(p.excluded_recurrence.as_deref(), &excluded)
+    {
+        return Err(unsupported_original("event.update"));
+    }
     let edits = p.when.is_some()
         || p.recurrence.as_ref().is_some_and(|r| *r != rules)
         || p.excluded_recurrence
@@ -184,6 +190,33 @@ pub async fn refuse_rule_edit(
             capability: "event.update".to_owned(),
             reason: "the rule and the start of this series are kept as written and cannot be edited here (Serie nur teilweise darstellbar)".to_owned(),
         });
+    }
+    Ok(())
+}
+
+fn made_original(new: Option<&[Recurrence]>, stored: &[Recurrence]) -> bool {
+    new.is_some_and(|n| {
+        n.iter()
+            .any(|r| matches!(r, Recurrence::Original(_)) && !stored.contains(r))
+    })
+}
+
+fn unsupported_original(capability: &str) -> fs_calendars_testdata::draft::Error {
+    fs_calendars_testdata::draft::Error::Unsupported {
+        capability: capability.to_owned(),
+        reason: "a recurrence rule kept as written comes with an import; it cannot be made or changed here".to_owned(),
+    }
+}
+
+/// A new appointment may not carry a rule kept as written.
+///
+/// # Errors
+/// `Unsupported` for such a draft.
+pub fn refuse_original_on_create(p: &fs_calendars_testdata::draft::AppointmentPatch) -> Result<()> {
+    if made_original(p.recurrence.as_deref(), &[])
+        || made_original(p.excluded_recurrence.as_deref(), &[])
+    {
+        return Err(unsupported_original("event.create"));
     }
     Ok(())
 }

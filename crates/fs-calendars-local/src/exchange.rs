@@ -185,6 +185,7 @@ impl Exchange for LocalExchange {
             }
         }
         let more = self.import_events(events, &source, ctx, as_type).await?;
+        report.people_proposal = more.people_proposal;
         report.created.extend(more.created);
         report.skipped.extend(more.skipped);
         report.failed.extend(more.failed);

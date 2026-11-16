@@ -8,7 +8,8 @@ use fs_calendars_testdata::conformance::{Asker, ConformanceFixture};
 use fs_calendars_testdata::draft::{Appointments, Attendee, ObjectId, PersonRef, Utc};
 use fs_calendars_testdata::ids::person;
 
-use crate::wrap::{Mutant, Wrap};
+use crate::mutant::Mutant;
+use crate::wrap::Wrap;
 
 /// The fake plus the provider under test (the fake itself, or a mutant that forwards to it).
 pub struct Fx {

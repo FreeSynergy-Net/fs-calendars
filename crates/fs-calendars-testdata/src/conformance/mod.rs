@@ -15,7 +15,9 @@ mod cx;
 mod fixture;
 mod rules_ai;
 mod rules_calendars;
+mod rules_deadline;
 mod rules_freebusy;
+mod rules_original;
 mod rules_purge;
 mod rules_subscribe;
 

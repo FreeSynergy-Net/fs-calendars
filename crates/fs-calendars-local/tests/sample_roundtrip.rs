@@ -1,5 +1,5 @@
 //! The fixed sample of the pilot through `LocalAppointments`: what the slice stores comes back equal; what it does not
-//! store yet is refused with `Unsupported` (the test names which, so the gap stays visible).
+//! store yet (or what only an import makes: a rule kept as written) is refused with `Unsupported` (the test names which, so the gap stays visible).
 
 #![allow(clippy::many_single_char_names, clippy::assert_is_empty)]
 
@@ -104,7 +104,7 @@ async fn every_sample_appointment_is_stored_equal_or_refused_by_name() {
     let names: Vec<&str> = refused.iter().map(|(s, _)| *s).collect();
     assert_eq!(
         names,
-        ["custom-zone", "invitation"],
+        ["custom-zone", "invitation", "original-series"],
         "exactly these are refused"
     );
     for (slug, e) in &refused {
@@ -116,6 +116,6 @@ async fn every_sample_appointment_is_stored_equal_or_refused_by_name() {
             other => panic!("{slug}: expected Unsupported, got {other:?}"),
         }
     }
-    assert_eq!(stored.len(), 48);
-    assert!(f.count("calendar_appointment").await >= 48);
+    assert_eq!(stored.len(), 47);
+    assert!(f.count("calendar_appointment").await >= 47);
 }

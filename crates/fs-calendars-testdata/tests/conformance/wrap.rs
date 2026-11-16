@@ -3,55 +3,19 @@
 
 use std::sync::Arc;
 
+use crate::mutant::{Mutant, is};
 use async_trait::async_trait;
 use fs_calendars_testdata::FakeAppointments;
 use fs_calendars_testdata::draft::{
     Answer, Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, AppointmentSummary,
     Appointments, Attendee, Availability, CalendarDeleted, CalendarInfo, CalendarPatch,
     Capabilities, Change, Deleted, Error, FreeBusyAnswer, HistoryEntry, Invitee, ObjectId, Page,
-    PersonRef, Place, Reference, Refresh, Refreshed, Restorable, Result, Revision, SeriesScope,
-    Trash, Utc, When, Window, Zone,
+    PersonRef, Place, Reference, Refresh, Refreshed, Result, Revision, SeriesScope, Trash, Utc,
+    When, Window, Zone,
 };
-
-/// The rule that is broken.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mutant {
-    /// Nothing is broken: a plain forward.
-    None,
-    /// `purge` deletes what is kept (the retention does not count).
-    PurgeIgnoresHold,
-    /// `purge` answers `Ok` and deletes nothing.
-    PurgeDoesNothing,
-    /// A person who does not share is `Unknown` (tells nothing about a calendar, but breaks the rule).
-    NotSharedAsUnknown,
-    /// An unknown participant is `Busy` with nothing (free: a guess).
-    UnknownGuessedFree,
-    /// Writing into a calendar in the trash is `Invalid` instead of `NotFound(calendar)`.
-    TrashedWriteInvalid,
-    /// A subscription answers `Forbidden` instead of `ReadOnly`.
-    ReadOnlyAsForbidden,
-    /// The cloud-metadata address is accepted as a feed.
-    FeedAcceptsMetadata,
-    /// A retention with an end shows as `Manual` (the end is lost, K8).
-    HeldEndLost,
-    /// An AI as owner is `Invalid` instead of `Forbidden`.
-    AiOwnerInvalid,
-    /// `update_calendar` does not look at the revision.
-    NoCompareAndSet,
-    /// A hidden calendar is `Forbidden` for an AI instead of `NotFound`.
-    HiddenForbidden,
-    /// The feed address is the `Origin.source` of a subscribed appointment.
-    FeedInOrigin,
-    /// `delete_calendar` does not count the appointments it took along.
-    CountLost,
-}
 
 /// The forwarding provider.
 pub struct Wrap(pub Arc<FakeAppointments>, pub Mutant);
-
-fn is(m: Mutant, want: Mutant) -> bool {
-    m == want
-}
 
 #[async_trait]
 impl Appointments for Wrap {
@@ -59,7 +23,7 @@ impl Appointments for Wrap {
         self.0.capabilities()
     }
     async fn calendars(&self, trash: Trash) -> Result<Vec<CalendarInfo>> {
-        self.0.calendars(trash).await
+        crate::tamper::calendars(self.1, self.0.calendars(trash).await)
     }
     async fn create_calendar(
         &self,
@@ -101,29 +65,32 @@ impl Appointments for Wrap {
         }
     }
     async fn delete_calendar(&self, id: ObjectId, expected: Revision) -> Result<CalendarDeleted> {
-        let mut r = self.0.delete_calendar(id, expected).await;
+        let mut r = crate::tamper::forbidden_as_invalid(
+            is(self.1, Mutant::AiDeleteInvalid),
+            self.0.delete_calendar(id, expected).await,
+        );
         if let (Ok(d), true) = (&mut r, is(self.1, Mutant::CountLost)) {
             d.appointments = 0;
         }
         r
     }
     async fn restore_calendar(&self, id: ObjectId) -> Result<CalendarInfo> {
-        self.0.restore_calendar(id).await
+        let r = self.0.restore_calendar(id).await;
+        crate::tamper::restore_calendar(self.1, &self.0, r).await
     }
     async fn subscribe_calendar(
         &self,
         name: &str,
         color: Option<&str>,
-        url: &Reference,
+        url0: &Reference,
         refresh: Refresh,
     ) -> Result<CalendarInfo> {
-        if is(self.1, Mutant::FeedAcceptsMetadata) && format!("{url:?}").contains("169.254.169.254")
-        {
-            let safe =
-                fs_calendars_testdata::zone::reference("https://kalender.example.org/safe.ics");
-            return self.0.subscribe_calendar(name, color, &safe, refresh).await;
-        }
-        self.0.subscribe_calendar(name, color, url, refresh).await
+        let url = crate::tamper::feed(self.1, url0);
+        let r = self
+            .0
+            .subscribe_calendar(name, color, url.as_ref().unwrap_or(url0), refresh)
+            .await;
+        crate::tamper::forbidden_as_invalid(is(self.1, Mutant::AiSubscribeInvalid), r)
     }
     async fn refresh_calendar(&self, id: ObjectId) -> Result<Refreshed> {
         self.0.refresh_calendar(id).await
@@ -149,12 +116,8 @@ impl Appointments for Wrap {
         size: usize,
     ) -> Result<Page<AppointmentSummary>> {
         let mut r = self.0.list(q, after, size).await;
-        if let (Ok(p), true) = (&mut r, is(self.1, Mutant::HeldEndLost)) {
-            for s in &mut p.items {
-                if matches!(s.trash, Some(Restorable::Held(Some(_)))) {
-                    s.trash = Some(Restorable::Manual);
-                }
-            }
+        if let Ok(p) = &mut r {
+            crate::tamper::trash_view(self.1, &mut p.items);
         }
         r
     }
@@ -176,7 +139,7 @@ impl Appointments for Wrap {
         self.0.search(text, after, size).await
     }
     async fn create(&self, draft: AppointmentDraft) -> Result<Appointment> {
-        let r = self.0.create(draft).await;
+        let r = crate::tamper::create(self.1, &self.0, draft).await;
         match r {
             Err(Error::NotFound(_)) if is(self.1, Mutant::TrashedWriteInvalid) => {
                 Err(Error::Invalid(Vec::new()))
@@ -218,7 +181,15 @@ impl Appointments for Wrap {
         self.0.delete(id, expected, scope).await
     }
     async fn restore(&self, id: ObjectId, scope: SeriesScope) -> Result<Appointment> {
-        self.0.restore(id, scope).await
+        let r = self.0.restore(id, scope).await;
+        match r {
+            Err(Error::ReadOnly { .. }) if is(self.1, Mutant::RestoreSubscribedForbidden) => {
+                Err(Error::Forbidden {
+                    capability: "event.restore".to_owned(),
+                })
+            }
+            other => other,
+        }
     }
     async fn purge(&self, id: ObjectId) -> Result<()> {
         match self.1 {
@@ -227,7 +198,14 @@ impl Appointments for Wrap {
                 self.0.purge(id).await
             }
             Mutant::PurgeDoesNothing => Ok(()),
-            _ => self.0.purge(id).await,
+            Mutant::PurgeLivingOk => match self.0.purge(id).await {
+                Err(Error::Invalid(_)) => Ok(()),
+                other => other,
+            },
+            m => crate::tamper::forbidden_as_invalid(
+                is(m, Mutant::AiPurgeInvalid),
+                self.0.purge(id).await,
+            ),
         }
     }
     async fn invite(

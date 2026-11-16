@@ -4,7 +4,10 @@
 
 use super::cx::{Cx, Report};
 use super::fixture::ConformanceFixture;
-use super::{rules_ai, rules_calendars, rules_freebusy, rules_purge, rules_subscribe};
+use super::{
+    rules_ai, rules_calendars, rules_deadline, rules_freebusy, rules_original, rules_purge,
+    rules_subscribe,
+};
 
 /// Run every rule against the provider of the fixture. The report names the failed rules; `skipped` names those a
 /// fixture could not set up.
@@ -28,6 +31,9 @@ pub async fn run_conformance(fx: &dyn ConformanceFixture) -> Report {
     } else {
         cx.skip("calendars: the provider does not offer calendar.update/delete/restore");
     }
+    if cx.offers(&["calendar.create", "event.create", "event.update"]) {
+        rules_original::original(&mut cx).await;
+    }
     if cx.offers(&["calendar.subscribe"]) {
         rules_subscribe::address(&mut cx).await;
         if cx.offers(&["calendar.refresh"]) {
@@ -49,6 +55,7 @@ pub async fn run_conformance(fx: &dyn ConformanceFixture) -> Report {
         rules_purge::retention(&mut cx).await;
         // The clock moves last: later rules would see a different "now".
         rules_purge::period(&mut cx).await;
+        rules_deadline::kept_calendar(&mut cx).await;
     } else {
         cx.skip("purge: the provider does not offer trash.purge");
     }

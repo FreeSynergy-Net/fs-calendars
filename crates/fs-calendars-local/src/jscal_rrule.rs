@@ -3,6 +3,10 @@
 //!
 //! Pattern: Adapter (JSON members to RRULE parts). The exact bytes of what was received stay in the kept original
 //! file (`object_original`); this text is what the typed store carries so that a series is never silently lost.
+//!
+//! Known limit (parts.rs asks for the received text byte for byte): a rule that came as JSON is rebuilt here from its
+//! members, so the stored `Original` text is NOT byte for byte what was received (the order and spelling of the parts
+//! are ours). The export is right all the same: it takes the received file from `object_original`, never this text.
 
 use serde_json::Value;
 
