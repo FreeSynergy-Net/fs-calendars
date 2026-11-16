@@ -10,7 +10,9 @@ use serde_json::Value;
 
 use crate::jscal_in::{RawPerson, pick, text};
 use crate::jscal_util::{flag_keys, parse_offset, parse_utc};
-use crate::words::{ALERT_ACTION, FREE_BUSY, PARTICIPATION, PRIVACY, RELATIVE_TO, STATUS};
+use crate::jscal_util::{format_duration, format_utc};
+use crate::words::{ALERT_ACTION, FREE_BUSY, PARTICIPATION, PRIVACY, RELATIVE_TO, STATUS, word};
+use serde_json::json;
 
 pub fn alerts_of(v: &Value, uid: &str, losses: &mut Vec<Loss>) -> Vec<Alert> {
     let Some(m) = v.get("alerts").and_then(Value::as_object) else {
@@ -137,4 +139,25 @@ pub fn patch_of(o: &Value, base: &When, uid: &str, losses: &mut Vec<Loss>) -> Ap
         }
     }
     p
+}
+
+/// An alert as JSON.
+#[must_use]
+pub fn alert_json(a: &Alert) -> Value {
+    let trigger = match a.trigger {
+        Trigger::Offset {
+            seconds,
+            relative_to,
+        } => {
+            let sign = if seconds < 0 { "-" } else { "" };
+            let mag = seconds.unsigned_abs();
+            let span = fs_calendar_testdata::draft::Span {
+                days: 0,
+                seconds: u32::try_from(mag).unwrap_or(u32::MAX),
+            };
+            json!({"@type": "OffsetTrigger", "offset": format!("{sign}{}", format_duration(span)), "relativeTo": word(&RELATIVE_TO, relative_to)})
+        }
+        Trigger::Absolute { at } => json!({"@type": "AbsoluteTrigger", "when": format_utc(at)}),
+    };
+    json!({"@type": "Alert", "trigger": trigger, "action": word(&ALERT_ACTION, a.action)})
 }

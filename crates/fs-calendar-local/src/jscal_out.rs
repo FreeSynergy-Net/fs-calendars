@@ -8,14 +8,14 @@
 use std::collections::HashMap;
 
 use fs_calendar_testdata::draft::{
-    Alert, Appointment, AppointmentPatch, Attendee, BasicValue, Loss, OverrideChange, Participant,
-    TextType, Trigger, When,
+    Appointment, AppointmentPatch, Attendee, BasicValue, Loss, OverrideChange, Participant,
+    TextType, When,
 };
 use serde_json::{Map, Value, json};
 
 use crate::jscal_rule::rule_to_json;
 use crate::jscal_util::{format_duration, format_utc};
-use crate::words::{ALERT_ACTION, FREE_BUSY, PARTICIPATION, PRIVACY, RELATIVE_TO, STATUS, word};
+use crate::words::{FREE_BUSY, PARTICIPATION, PRIVACY, STATUS, word};
 
 /// The members of an event that make up its recurrence.
 pub const RECURRENCE_KEYS: [&str; 4] = [
@@ -122,25 +122,6 @@ fn participant(
     Some(o)
 }
 
-fn alert(a: &Alert) -> Value {
-    let trigger = match a.trigger {
-        Trigger::Offset {
-            seconds,
-            relative_to,
-        } => {
-            let sign = if seconds < 0 { "-" } else { "" };
-            let mag = seconds.unsigned_abs();
-            let span = fs_calendar_testdata::draft::Span {
-                days: 0,
-                seconds: u32::try_from(mag).unwrap_or(u32::MAX),
-            };
-            json!({"@type": "OffsetTrigger", "offset": format!("{sign}{}", format_duration(span)), "relativeTo": word(&RELATIVE_TO, relative_to)})
-        }
-        Trigger::Absolute { at } => json!({"@type": "AbsoluteTrigger", "when": format_utc(at)}),
-    };
-    json!({"@type": "Alert", "trigger": trigger, "action": word(&ALERT_ACTION, a.action)})
-}
-
 fn override_patch(p: &AppointmentPatch, uid: &str, rid: &str, losses: &mut Vec<Loss>) -> Value {
     let mut o = Map::new();
     if let Some(t) = &p.title {
@@ -234,7 +215,12 @@ pub fn event_json(
     if !a.alerts.is_empty() {
         o.insert(
             "alerts".into(),
-            Value::Object(a.alerts.iter().map(|x| (x.key.clone(), alert(x))).collect()),
+            Value::Object(
+                a.alerts
+                    .iter()
+                    .map(|x| (x.key.clone(), crate::jscal_parts::alert_json(x)))
+                    .collect(),
+            ),
         );
     }
     if a.use_default_alerts {
