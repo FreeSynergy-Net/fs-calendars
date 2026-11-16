@@ -4,7 +4,7 @@
 mod common;
 
 use common::{loaded, utc, window};
-use fs_calendar_testdata::draft::{Answer, Appointments, Error, RuleEnd, SeriesScope};
+use fs_calendar_testdata::draft::{Answer, Appointments, Error, SeriesScope};
 use fs_calendar_testdata::ids::person;
 use fs_calendar_testdata::sample::at;
 
@@ -48,7 +48,7 @@ async fn restore_this_and_following_gives_the_series_back() {
     assert!(count(&window(&f, from, to).await, a.id) < before);
     f.restore(a.id, scope).await.unwrap();
     let now = f.get(a.id).await.unwrap().unwrap();
-    assert!(!matches!(now.recurrence[0].end, RuleEnd::Until(_)) || now.recurrence == a.recurrence);
+    assert_eq!(now.recurrence, a.recurrence);
     assert_eq!(count(&window(&f, from, to).await, a.id), before);
 }
 

@@ -8,7 +8,7 @@ use crate::draft::{
 };
 use crate::fake::FakeAppointments;
 use crate::instances::in_window;
-use crate::state::{Item, State};
+use crate::state::{Item, State, TRASH_MS};
 use crate::zone::{self, bounds};
 
 fn page<T: Clone>(all: &[T], after: Option<&Place>, size: usize) -> Result<Page<T>> {
@@ -35,7 +35,8 @@ fn page<T: Clone>(all: &[T], after: Option<&Place>, size: usize) -> Result<Page<
     })
 }
 
-fn summary(a: &Appointment) -> AppointmentSummary {
+fn summary(item: &Item) -> AppointmentSummary {
+    let a = &item.appt;
     AppointmentSummary {
         id: a.id,
         calendar: a.calendar,
@@ -44,7 +45,9 @@ fn summary(a: &Appointment) -> AppointmentSummary {
         when: a.when.clone(),
         recurring: !a.recurrence.is_empty(),
         revision: a.revision,
-        restorable_until: None,
+        restorable_until: item
+            .deleted
+            .map(|d| Utc::from_millis(d.millis() + TRASH_MS)),
     }
 }
 
@@ -63,14 +66,9 @@ fn contains(a: &Appointment, needle: &str) -> bool {
     hit(&a.title) || hit(&a.description) || a.locations.iter().any(|l| hit(&l.name))
 }
 
-fn sorted(s: &State, keep: impl Fn(&Item) -> bool) -> Vec<&Appointment> {
-    let mut v: Vec<&Appointment> = s
-        .items
-        .values()
-        .filter(|i| keep(i))
-        .map(|i| &i.appt)
-        .collect();
-    v.sort_by_key(|a| (first_start(s, a), a.id));
+fn sorted(s: &State, keep: impl Fn(&Item) -> bool) -> Vec<&Item> {
+    let mut v: Vec<&Item> = s.items.values().filter(|i| keep(i)).collect();
+    v.sort_by_key(|i| (first_start(s, &i.appt), i.appt.id));
     v
 }
 
@@ -104,20 +102,20 @@ impl FakeAppointments {
         });
         let kept: Vec<AppointmentSummary> = rows
             .into_iter()
-            .filter(|a| q.text.as_deref().is_none_or(|t| contains(a, t)))
-            .filter(|a| {
+            .filter(|i| q.text.as_deref().is_none_or(|t| contains(&i.appt, t)))
+            .filter(|i| {
                 q.participant
                     .as_ref()
-                    .is_none_or(|p| a.participants.iter().any(|x| x.who == *p))
+                    .is_none_or(|p| i.appt.participants.iter().any(|x| x.who == *p))
             })
-            .filter(|a| match (q.from, q.to) {
+            .filter(|i| match (q.from, q.to) {
                 (None, None) => true,
                 (from, to) => {
                     let (lo, hi) = (
                         from.unwrap_or(Utc::from_millis(i64::MIN)),
                         to.unwrap_or(Utc::from_millis(i64::MAX)),
                     );
-                    let (found, _) = in_window(a, &s.customs, None, &utc_zone(), lo, hi);
+                    let (found, _) = in_window(&i.appt, &s.customs, None, &utc_zone(), lo, hi);
                     !found.is_empty()
                 }
             })
@@ -179,7 +177,7 @@ impl FakeAppointments {
         let s = self.lock();
         let hits: Vec<AppointmentSummary> = sorted(&s, |i| i.deleted.is_none())
             .into_iter()
-            .filter(|a| contains(a, text))
+            .filter(|i| contains(&i.appt, text))
             .map(summary)
             .collect();
         page(&hits, after, size)

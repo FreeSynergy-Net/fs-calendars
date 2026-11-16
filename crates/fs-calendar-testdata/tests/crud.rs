@@ -208,8 +208,14 @@ async fn delete_goes_to_the_trash_and_restore_brings_it_back() {
         text: Some("zahnarzt".to_owned()),
         ..AppointmentQuery::default()
     };
-    assert_eq!(f.list(&q, None, 10).await.unwrap().items.len(), 1);
+    let trashed = f.list(&q, None, 10).await.unwrap().items;
+    assert_eq!(trashed.len(), 1);
+    assert_eq!(trashed[0].restorable_until, d.restorable_until);
+    assert!(trashed[0].restorable_until.is_some());
     assert!(f.restore(a.id, SeriesScope::Whole).await.is_ok());
+    let living = f.list(&q, None, 10).await.unwrap().items;
+    assert_eq!(living.len(), 1);
+    assert_eq!(living[0].restorable_until, None);
     assert!(f.get(a.id).await.unwrap().is_some());
     assert!(
         matches!(
