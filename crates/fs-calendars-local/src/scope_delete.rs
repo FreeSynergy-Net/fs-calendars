@@ -5,7 +5,8 @@
 
 use fs_calendars_testdata::draft::{
     Appointment, Deleted, Error, FieldChange, HistoryKind, LocalDateTime, ObjectId, Override,
-    OverrideChange, PersonRef, Result, Revision, RuleEnd, SeriesScope, Utc, Value as Val,
+    OverrideChange, PersonRef, Recurrence, Restorable, Result, Revision, RuleEnd, SeriesScope, Utc,
+    Value as Val,
 };
 use fs_calendars_testdata::instances::series_start;
 use fs_calendars_testdata::scope::{occurrence, truncate};
@@ -15,6 +16,7 @@ use crate::codec::{invalid, naive_secs};
 use crate::cuts::{save_cut, take_cut};
 use crate::envelope::{bump, log, trash, trash_days};
 use crate::read::load;
+use crate::restorable::restorable;
 use crate::scope_ops::live;
 use crate::series::{put_exception, unexclude};
 use crate::series_hide::{hide, unhide};
@@ -26,7 +28,7 @@ const DAY_MS: i64 = 86_400_000;
 fn marked(rid: LocalDateTime, what: &str) -> FieldChange {
     FieldChange {
         field: "override".to_owned(),
-        row_key: Some(fs_calendars_testdata::draft::BasicValue::canonical(&rid)),
+        row_key: Some(rid.canonical()),
         old: None,
         new: Some(Val::Text(what.to_owned())),
     }
@@ -57,12 +59,17 @@ pub async fn delete_partial(
         return Ok(Deleted {
             id,
             scope,
-            restorable_until: Some(Utc::from_millis(until)),
+            restorable: restorable(c, &[id], until, now).await?,
         });
     }
     let until = now + trash_days(c).await? * DAY_MS;
     if following {
-        let ends: Vec<RuleEnd> = cur.recurrence.iter().map(|r| r.end).collect();
+        // One end per position of the list (an `Original` rule has none of its own and is never cut).
+        let ends: Vec<RuleEnd> = cur
+            .recurrence
+            .iter()
+            .map(|r| r.rule().map_or(RuleEnd::Never, |x| x.end))
+            .collect();
         let mut head = cur.clone();
         truncate(&mut head, at);
         write_appointment(c, &head).await?;
@@ -114,7 +121,7 @@ pub async fn delete_partial(
     Ok(Deleted {
         id,
         scope,
-        restorable_until: Some(Utc::from_millis(until)),
+        restorable: Restorable::Until(Utc::from_millis(until)),
     })
 }
 
@@ -150,7 +157,9 @@ pub async fn restore_partial(
         }
         let mut back = cur.clone();
         for (r, end) in back.recurrence.iter_mut().zip(&cut.ends) {
-            r.end = *end;
+            if let Recurrence::Rule(rule) = r {
+                rule.end = *end;
+            }
         }
         write_appointment(c, &back).await?;
         let at =

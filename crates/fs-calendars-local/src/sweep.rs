@@ -11,8 +11,8 @@ use fs_objects::v5::log::redact;
 use fs_objects::v5::purge::{Done, HookFuture};
 use fs_types as ft;
 
-use crate::bridge::{adapt, oid, person, person_back, to_v5};
 use crate::codec::{Row, get_id, get_int, id_value, int};
+use crate::convert::{adapt, to_v5};
 use crate::read::load;
 use crate::registry::DOMAIN;
 use crate::series::scrub_exception;
@@ -37,7 +37,7 @@ pub struct Swept {
 /// # Errors
 /// The engine's error.
 pub async fn sweep_expired(c: &Conn<'_>, now: i64, actor: &PersonRef) -> Result<Swept> {
-    let done = v5::purge::sweep(c.inner(), &DOMAIN, now, &person(actor)?)
+    let done = v5::purge::sweep(c.inner(), &DOMAIN, now, actor)
         .await
         .map_err(adapt)?;
     Ok(Swept {
@@ -61,8 +61,7 @@ pub fn on_cut<'a>(
 ) -> HookFuture<'a> {
     Box::pin(async move {
         let c = Conn::Borrowed(c);
-        let actor = person_back(actor).map_err(to_v5)?;
-        expired(&c, row, now, &actor).await.map_err(to_v5)
+        expired(&c, row, now, actor).await.map_err(to_v5)
     })
 }
 
@@ -117,8 +116,8 @@ async fn scrub(
     scrub_exception(c, &m.appt, rid, actor, now).await?;
     // The log of the master names the changed fields of that occurrence (`override.*`, the occurrence as row key):
     // the changes go, their entries are marked `redacted`. `touch` writes no log entry; none is needed here.
-    let key = fs_calendars_testdata::draft::BasicValue::canonical(&rid);
-    redact(c.inner(), oid(master), &key, "override.%")
+    let key = rid.canonical();
+    redact(c.inner(), master, &key, "override.%")
         .await
         .map_err(adapt)?;
     Ok(1)

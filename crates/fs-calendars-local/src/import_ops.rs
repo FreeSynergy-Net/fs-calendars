@@ -60,10 +60,7 @@ pub async fn import_one(
         if occurrence(&a, *rid).is_err() {
             losses.push(Loss {
                 uid: Some(read.uid.clone()),
-                field: format!(
-                    "recurrenceOverrides/{}",
-                    fs_calendars_testdata::draft::BasicValue::canonical(rid)
-                ),
+                field: format!("recurrenceOverrides/{}", rid.canonical()),
                 reason: "not an occurrence of the series: left out".into(),
             });
             continue;

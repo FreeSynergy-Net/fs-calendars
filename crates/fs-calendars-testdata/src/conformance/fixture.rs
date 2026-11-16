@@ -3,6 +3,8 @@
 //! Pattern: Strategy / Test fixture (the rules are written once; each provider says how to move its clock or switch
 //! the asker, so the same rules run against the fake and later against `LocalAppointments`).
 
+use async_trait::async_trait;
+
 use crate::draft::{Appointments, Attendee, ObjectId, PersonRef, Utc};
 
 /// Who asks. `Owner` is the normal asker; the others only exist when the fixture can switch.
@@ -18,12 +20,13 @@ pub enum Asker {
 
 /// The provider under test plus the mutators behind it. A mutator the provider cannot offer keeps its default
 /// (`false` / `None`); the rules that need it are skipped.
+#[async_trait]
 pub trait ConformanceFixture: Send + Sync {
     /// The provider under test.
     fn appointments(&self) -> &dyn Appointments;
 
     /// Switch who asks (`true` when done).
-    fn switch_asker(&self, _who: Asker) -> bool {
+    async fn switch_asker(&self, _who: Asker) -> bool {
         false
     }
 
@@ -38,22 +41,22 @@ pub trait ConformanceFixture: Send + Sync {
     }
 
     /// Invite the AI account to a calendar (it sees nothing else).
-    fn invite_ai(&self, _calendar: ObjectId) -> bool {
+    async fn invite_ai(&self, _calendar: ObjectId) -> bool {
         false
     }
 
     /// Move the provider's clock forward (`true` when done).
-    fn advance_clock(&self, _millis: i64) -> bool {
+    async fn advance_clock(&self, _millis: i64) -> bool {
         false
     }
 
     /// Set the trash period in ms, `None` = "never delete automatically" (`true` when done).
-    fn set_trash_period(&self, _millis: Option<i64>) -> bool {
+    async fn set_trash_period(&self, _millis: Option<i64>) -> bool {
         false
     }
 
     /// Keep an appointment or calendar (retention) until `end` (`None` = without end); `true` when done.
-    fn hold(&self, _id: ObjectId, _end: Option<Utc>) -> bool {
+    async fn hold(&self, _id: ObjectId, _end: Option<Utc>) -> bool {
         false
     }
 
@@ -63,12 +66,12 @@ pub trait ConformanceFixture: Send + Sync {
     }
 
     /// This participant shares free/busy times with the asker (`true` when done).
-    fn share_with_asker(&self, _who: &Attendee) -> bool {
+    async fn share_with_asker(&self, _who: &Attendee) -> bool {
         false
     }
 
     /// What fetching `address` delivers: `(uid, title)` per appointment (`true` when done).
-    fn set_feed(&self, _address: &str, _entries: &[(&str, &str)]) -> bool {
+    async fn set_feed(&self, _address: &str, _entries: &[(&str, &str)]) -> bool {
         false
     }
 }

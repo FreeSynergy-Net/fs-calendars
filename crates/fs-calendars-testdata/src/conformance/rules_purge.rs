@@ -96,7 +96,7 @@ async fn trash_of(cx: &Cx<'_>, cal: ObjectId, id: ObjectId) -> Option<Restorable
 /// A retention beats everything: `Held`, `purge` is `Forbidden` and deletes nothing.
 pub(super) async fn retention(cx: &mut Cx<'_>) {
     let dir = cx.dir;
-    let (Some(now), true) = (cx.fx.now(), cx.fx.set_trash_period(Some(30 * DAY))) else {
+    let (Some(now), true) = (cx.fx.now(), cx.fx.set_trash_period(Some(30 * DAY)).await) else {
         cx.skip("retention: the fixture cannot set the period or tell the time");
         return;
     };
@@ -120,7 +120,10 @@ pub(super) async fn retention(cx: &mut Cx<'_>) {
     }
     let end = Utc::from_millis(now.millis() + 90 * DAY);
     let soon = Utc::from_millis(now.millis() + 10 * DAY);
-    if !(cx.fx.hold(a.id, None) && cx.fx.hold(b.id, Some(end)) && cx.fx.hold(d.id, Some(soon))) {
+    if !(cx.fx.hold(a.id, None).await
+        && cx.fx.hold(b.id, Some(end)).await
+        && cx.fx.hold(d.id, Some(soon)).await)
+    {
         cx.skip("retention: the fixture cannot keep an object");
         return;
     }
@@ -160,7 +163,7 @@ pub(super) async fn retention(cx: &mut Cx<'_>) {
         return;
     };
     let _ = dir.delete_calendar(k.id, k.revision).await;
-    if cx.fx.hold(y.id, None) {
+    if cx.fx.hold(y.id, None).await {
         let r = dir.purge(k.id).await;
         cx.fails(
             &r,
@@ -179,7 +182,11 @@ pub(super) async fn retention(cx: &mut Cx<'_>) {
         );
     }
     // A retention that has ended does not count.
-    if cx.fx.hold(a.id, Some(Utc::from_millis(now.millis() - DAY))) {
+    if cx
+        .fx
+        .hold(a.id, Some(Utc::from_millis(now.millis() - DAY)))
+        .await
+    {
         cx.ensure(
             dir.purge(a.id).await.is_ok(),
             "purge: a retention that has ended does not hold",
@@ -194,7 +201,7 @@ pub(super) async fn period(cx: &mut Cx<'_>) {
         cx.skip("period: the fixture cannot tell the time");
         return;
     };
-    if !cx.fx.set_trash_period(None) {
+    if !cx.fx.set_trash_period(None).await {
         cx.skip("period: the fixture cannot set 'never automatically'");
         return;
     }
@@ -217,7 +224,7 @@ pub(super) async fn period(cx: &mut Cx<'_>) {
         return;
     };
     let end = Utc::from_millis(now.millis() + 10 * DAY);
-    if cx.fx.hold(b.id, Some(end)) {
+    if cx.fx.hold(b.id, Some(end)).await {
         let only = cx.all(&[c.id], Trash::Only).await;
         cx.ensure(
             only.iter().any(|s| s.id == b.id && s.trash == Some(Restorable::Held(Some(end)))),
@@ -225,7 +232,7 @@ pub(super) async fn period(cx: &mut Cx<'_>) {
         );
     }
     let _ = db;
-    if cx.fx.advance_clock(3650 * DAY) {
+    if cx.fx.advance_clock(3650 * DAY).await {
         cx.ensure(
             cx.all(&[c.id], Trash::Only)
                 .await
@@ -248,7 +255,7 @@ pub(super) async fn period(cx: &mut Cx<'_>) {
         cx.skip("Manual: the fixture cannot move the clock");
     }
     // The deadline: after the period everything is gone for good.
-    if !cx.fx.set_trash_period(Some(30 * DAY)) {
+    if !cx.fx.set_trash_period(Some(30 * DAY)).await {
         return;
     }
     let Some(c2) = cx.calendar("deadline").await else {
@@ -264,7 +271,7 @@ pub(super) async fn period(cx: &mut Cx<'_>) {
         matches!(d.restorable, Restorable::Until(_)),
         "delete: a period gives Until",
     );
-    if cx.fx.advance_clock(31 * DAY) {
+    if cx.fx.advance_clock(31 * DAY).await {
         let r = dir.restore(t.id, SeriesScope::Whole).await;
         cx.fails(
             &r,

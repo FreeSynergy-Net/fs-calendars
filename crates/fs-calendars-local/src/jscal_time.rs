@@ -5,9 +5,7 @@
 
 use std::collections::HashMap;
 
-use fs_calendars_testdata::draft::{
-    BasicValue, ImportContext, LocalDateTime, Loss, Result, Span, When, Zone,
-};
+use fs_calendars_testdata::draft::{ImportContext, LocalDateTime, Loss, Result, Span, When, Zone};
 use fs_calendars_testdata::zone::{iana, resolve};
 use serde_json::Value;
 

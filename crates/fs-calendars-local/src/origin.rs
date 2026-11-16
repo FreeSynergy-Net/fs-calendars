@@ -9,13 +9,11 @@ use fs_calendars_testdata::draft::{
     Revision, Utc,
 };
 use fs_objects::v5::original as layer;
-use fs_types as ft;
 
-use crate::bridge::{adapt, oid, reference, rev};
-use crate::bridge_values::local;
 use crate::codec::{
     get_int, get_opt_int, get_opt_text, get_text, id_value, int_to_local, reference_of, text,
 };
+use crate::convert::adapt;
 use crate::registry::DOMAIN;
 use crate::series_tables::UNREAD;
 use crate::store::Conn;
@@ -61,19 +59,18 @@ pub async fn record(
     rev_at_import: Revision,
     now: i64,
 ) -> Result<()> {
-    let media = |m: &MediaType| ft::MediaType(m.0.clone());
     let ours = layer::NewOrigin {
         channel: word(&CHANNELS, o.channel).to_owned(),
-        source: reference(&o.source)?,
-        media_type: media(&o.media_type),
+        source: o.source.clone(),
+        media_type: o.media_type.clone(),
         foreign_uid: o.foreign_uid.clone(),
-        foreign_recurrence_id: o.foreign_recurrence_id.map(local).transpose()?,
+        foreign_recurrence_id: o.foreign_recurrence_id,
         foreign_etag: o.foreign_etag.clone(),
         prod_id: o.prod_id.clone(),
         importer: o.importer.clone(),
-        original: o.original.as_ref().map(|(b, m)| (b.clone(), media(m))),
+        original: o.original.clone(),
     };
-    layer::record(c.inner(), &DOMAIN, oid(id), &ours, rev(rev_at_import), now)
+    layer::record(c.inner(), &DOMAIN, id, &ours, rev_at_import, now)
         .await
         .map_err(adapt)
 }
@@ -140,10 +137,7 @@ fn from_hex(hex: &str) -> Result<[u8; 32]> {
 /// # Errors
 /// `Unavailable` for a row that does not read back.
 pub async fn original_of(c: &Conn<'_>, id: ObjectId) -> Result<Option<(Vec<u8>, MediaType)>> {
-    Ok(layer::original_of(c.inner(), oid(id))
-        .await
-        .map_err(adapt)?
-        .map(|(b, m)| (b, MediaType(m.0))))
+    layer::original_of(c.inner(), id).await.map_err(adapt)
 }
 
 /// Mark a part this program cannot interpret (the part stays in the original).
@@ -177,10 +171,15 @@ pub async fn refuse_rule_edit(
     id: ObjectId,
     p: &fs_calendars_testdata::draft::AppointmentPatch,
 ) -> Result<()> {
-    // The start is part of it: the kept `EXDATE` and exceptions point at the old times.
-    if (p.recurrence.is_some() || p.excluded_recurrence.is_some() || p.when.is_some())
-        && !read_unread(c, id).await?.is_empty()
-    {
+    // The start is part of it: the kept `EXDATE` and exceptions point at the old times. Giving back the rules as they
+    // are is no edit (R1: the original rule travels with the appointment).
+    let (rules, excluded) = crate::rules::read_rules(c, id).await?;
+    let edits = p.when.is_some()
+        || p.recurrence.as_ref().is_some_and(|r| *r != rules)
+        || p.excluded_recurrence
+            .as_ref()
+            .is_some_and(|r| *r != excluded);
+    if edits && !read_unread(c, id).await?.is_empty() {
         return Err(fs_calendars_testdata::draft::Error::Unsupported {
             capability: "event.update".to_owned(),
             reason: "the rule and the start of this series are kept as written and cannot be edited here (Serie nur teilweise darstellbar)".to_owned(),

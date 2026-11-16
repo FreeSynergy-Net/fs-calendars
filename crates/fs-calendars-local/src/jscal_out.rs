@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use fs_calendars_testdata::draft::{
     Appointment, AppointmentPatch, Attendee, BasicValue, Loss, OverrideChange, Participant,
-    TextType, When,
+    Recurrence, RecurrenceRule, TextType, When,
 };
 use serde_json::{Map, Value, json};
 
@@ -226,7 +226,16 @@ pub fn event_json(
     if a.use_default_alerts {
         o.insert("useDefaultAlerts".into(), json!(true));
     }
-    if let [first, rest @ ..] = a.recurrence.as_slice() {
+    let typed: Vec<&RecurrenceRule> = a.recurrence.iter().filter_map(Recurrence::rule).collect();
+    if typed.len() < a.recurrence.len() {
+        // The text of an original rule is written back from the kept original (`kept`), not rebuilt here.
+        losses.push(Loss {
+            uid: Some(a.uid.clone()),
+            field: "recurrence".into(),
+            reason: "a rule kept as written is not rebuilt: it stays in the original".into(),
+        });
+    }
+    if let [first, rest @ ..] = typed.as_slice() {
         o.insert("recurrenceRule".into(), rule_to_json(first));
         if !rest.is_empty() {
             losses.push(Loss {

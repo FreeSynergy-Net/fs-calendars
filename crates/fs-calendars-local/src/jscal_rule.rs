@@ -3,7 +3,7 @@
 //! Pattern: Adapter (typed rule to JSON and back). A rule with a part the engine does not expand is read as
 //! `None`: the caller marks it (`calendar_unread`), keeps the part in the original and reports a loss.
 
-use fs_calendars_testdata::draft::{BasicValue, LocalDateTime};
+use fs_calendars_testdata::draft::LocalDateTime;
 use fs_calendars_testdata::draft::{ByMonth, NDay, RecurrenceRule, RuleEnd};
 use serde_json::{Map, Value, json};
 

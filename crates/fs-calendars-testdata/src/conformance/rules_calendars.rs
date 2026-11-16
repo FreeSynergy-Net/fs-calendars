@@ -204,29 +204,31 @@ pub(super) async fn cascade(cx: &mut Cx<'_>) {
         "delete of an appointment in a calendar in the trash is NotFound(calendar)",
         &nf,
     );
-    let r = dir.invite(a.id, a.revision, &[], SeriesScope::Whole).await;
-    cx.fails(
-        &r,
-        "invite in a calendar in the trash is NotFound(calendar)",
-        &nf,
-    );
-    let me = c.owner.clone();
-    let r = dir
-        .respond(
-            a.id,
-            a.revision,
-            &me,
-            Answer::Accept,
-            None,
-            None,
-            SeriesScope::Whole,
-        )
-        .await;
-    cx.fails(
-        &r,
-        "respond in a calendar in the trash is NotFound(calendar)",
-        &nf,
-    );
+    if cx.offers(&["invite.create", "invite.answer"]) {
+        let r = dir.invite(a.id, a.revision, &[], SeriesScope::Whole).await;
+        cx.fails(
+            &r,
+            "invite in a calendar in the trash is NotFound(calendar)",
+            &nf,
+        );
+        let me = c.owner.clone();
+        let r = dir
+            .respond(
+                a.id,
+                a.revision,
+                &me,
+                Answer::Accept,
+                None,
+                None,
+                SeriesScope::Whole,
+            )
+            .await;
+        cx.fails(
+            &r,
+            "respond in a calendar in the trash is NotFound(calendar)",
+            &nf,
+        );
+    }
     let r = dir.restore(a.id, SeriesScope::Whole).await;
     cx.fails(
         &r,
@@ -250,12 +252,14 @@ pub(super) async fn cascade(cx: &mut Cx<'_>) {
         "delete_calendar on a calendar in the trash is NotFound(id)",
         &nf,
     );
-    let r = dir.refresh_calendar(c.id).await;
-    cx.fails(
-        &r,
-        "refresh_calendar on a calendar in the trash is NotFound(id)",
-        &nf,
-    );
+    if cx.offers(&["calendar.refresh"]) {
+        let r = dir.refresh_calendar(c.id).await;
+        cx.fails(
+            &r,
+            "refresh_calendar on a calendar in the trash is NotFound(id)",
+            &nf,
+        );
+    }
     // Back: the calendar and what went with it; the one deleted before stays in the trash.
     let r = dir.restore_calendar(c.id).await;
     cx.ensure(

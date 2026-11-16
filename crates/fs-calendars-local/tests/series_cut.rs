@@ -14,6 +14,7 @@ use fs_calendars_testdata::draft::{
     Appointment, AppointmentPatch, AppointmentQuery, Appointments, BasicValue, Error, Frequency,
     LocalDateTime, Relation, RuleEnd, SeriesScope, Window,
 };
+use fs_calendars_testdata::draft::{Recurrence, Restorable};
 use fs_calendars_testdata::sample::{at, rule, timed};
 use fs_calendars_testdata::zone::iana;
 
@@ -87,7 +88,7 @@ async fn this_and_following_splits_the_series() {
     assert_ne!(tail.id, a.id);
     assert_ne!(tail.uid, a.uid);
     assert_eq!(
-        tail.recurrence[0].end,
+        tail.recurrence[0].rule().unwrap().end,
         RuleEnd::Count(3),
         "the count follows the split"
     );
@@ -109,7 +110,7 @@ async fn this_and_following_splits_the_series() {
     );
     assert!(head.overrides.is_empty());
     assert!(
-        matches!(head.recurrence[0].end, RuleEnd::Until(u) if u.canonical() == "2026-11-16T08:59:59")
+        matches!(head.recurrence[0].rule().unwrap().end, RuleEnd::Until(u) if u.canonical() == "2026-11-16T08:59:59")
     );
     let w = days(&f).await;
     let titles: Vec<&str> = w.instances.iter().map(|i| i.title.as_str()).collect();
@@ -132,7 +133,7 @@ async fn this_and_following_at_the_first_occurrence_acts_like_the_whole_series()
     );
     assert_eq!(f.count("calendar_appointment").await, 1);
     let d = f.p.delete(a.id, u.revision, following(2)).await.unwrap();
-    assert!(d.restorable_until.is_some());
+    assert!(matches!(d.restorable, Restorable::Until(_)));
     assert!(
         f.p.get(a.id).await.unwrap().is_none(),
         "the whole series is in the trash"
@@ -174,14 +175,17 @@ async fn the_split_counts_every_rule_and_logs_the_head_fully() {
     let mut d = f.draft("Zwei Regeln", timed(rid(2), "Europe/Berlin", 60));
     let (mut a1, mut a2) = (rule(Frequency::Weekly), rule(Frequency::Daily));
     (a1.end, a2.end) = (RuleEnd::Count(6), RuleEnd::Count(10));
-    d.rest.recurrence = Some(vec![a1, a2]);
+    d.rest.recurrence = Some(vec![Recurrence::Rule(a1), Recurrence::Rule(a2)]);
     let a = f.p.create(d).await.unwrap();
     let tail =
         f.p.update(a.id, a.revision, title("Rest"), following(9))
             .await
             .unwrap();
     assert_eq!(
-        tail.recurrence.iter().map(|r| r.end).collect::<Vec<_>>(),
+        tail.recurrence
+            .iter()
+            .map(|r| r.rule().unwrap().end)
+            .collect::<Vec<_>>(),
         [RuleEnd::Count(5), RuleEnd::Count(3)],
         "weekly 2,9,.. leaves 5 of 6; daily 2..8 are 7 before the 9th, 10 - 7 = 3 left"
     );

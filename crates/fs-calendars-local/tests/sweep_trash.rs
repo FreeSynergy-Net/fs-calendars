@@ -8,6 +8,7 @@ mod common;
 use common::fx;
 use fs_calendars_local::codec::id_text;
 use fs_calendars_testdata::draft::{Appointments, Error, SeriesScope};
+use fs_calendars_testdata::ids::end_of;
 
 #[tokio::test]
 async fn a_trashed_object_goes_for_good_exactly_when_its_period_ends() {
@@ -18,7 +19,7 @@ async fn a_trashed_object_goes_for_good_exactly_when_its_period_ends() {
         f.p.delete(a.id, a.revision, SeriesScope::Whole)
             .await
             .unwrap();
-    let until = d.restorable_until.unwrap().millis();
+    let until = end_of(d.restorable).unwrap().millis();
     f.set_now(until - 1);
     let early = f.p.sweep_expired().await.unwrap();
     assert_eq!(early.objects, 0, "nothing goes before the promised time");
@@ -47,7 +48,11 @@ async fn a_trashed_object_goes_for_good_exactly_when_its_period_ends() {
 async fn a_collection_with_appointments_that_ended_its_trash_period_does_not_block_the_run() {
     let f = fx().await;
     let a = f.make_berlin("a", 2, 9).await;
-    let keep = f.p.create_calendar("Zweiter", None, None).await.unwrap().id;
+    let keep =
+        f.p.create_calendar("Zweiter", None, None, None)
+            .await
+            .unwrap()
+            .id;
     let id = id_text(f.cal);
     // No program function deletes a collection yet; the layer's trash is set the way it would.
     f.exec(&format!(

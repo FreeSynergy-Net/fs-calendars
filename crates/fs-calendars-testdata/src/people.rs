@@ -32,6 +32,9 @@ pub trait Directory: Send + Sync {
     async fn open_batch(&self, origin: &Reference) -> Result<ObjectId>;
     /// `person.propose`: add an entry, optionally in an open batch; a known address gives the existing reference.
     async fn propose(&self, entry: &ProposeEntry, batch: Option<ObjectId>) -> Result<PersonRef>;
+    /// Stand-in for `person.excerpt` with the purpose "export": name and address of a person for the `CN` and the
+    /// `mailto:` of an iCalendar file; `None` when there is nothing to show.
+    async fn display(&self, person: &PersonRef) -> Result<Option<(String, Option<String>)>>;
 }
 
 /// One known person.
@@ -121,17 +124,6 @@ impl FakePeople {
         }
     }
 
-    /// Name and address of a person (known or proposed), for display.
-    #[must_use]
-    pub fn display(&self, p: &PersonRef) -> Option<(String, String)> {
-        let inner = self.inner();
-        self.known
-            .iter()
-            .chain(inner.proposed.iter().map(|x| &x.known))
-            .find(|k| k.person.id == p.id)
-            .map(|k| (k.name.clone(), k.address.clone()))
-    }
-
     fn hits(&self, address: &str) -> Vec<PersonRef> {
         let inner = self.inner();
         self.known
@@ -164,6 +156,21 @@ impl Directory for FakePeople {
         let id = object_id(inner.next);
         inner.batches.push((id, origin.clone()));
         Ok(id)
+    }
+
+    async fn display(&self, p: &PersonRef) -> Result<Option<(String, Option<String>)>> {
+        let inner = self.inner();
+        Ok(self
+            .known
+            .iter()
+            .chain(inner.proposed.iter().map(|x| &x.known))
+            .find(|k| k.person.id == p.id)
+            .map(|k| {
+                (
+                    k.name.clone(),
+                    Some(k.address.clone()).filter(|a| !a.is_empty()),
+                )
+            }))
     }
 
     async fn propose(&self, entry: &ProposeEntry, batch: Option<ObjectId>) -> Result<PersonRef> {

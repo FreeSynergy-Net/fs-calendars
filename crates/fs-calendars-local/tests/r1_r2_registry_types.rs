@@ -22,15 +22,7 @@ const ONE: Table = Table {
     constraints: &["PRIMARY KEY (id)"],
     indexes: &[],
 };
-const TASKS: Domain = Domain {
-    prefix: "tasks",
-    about: "tasks",
-    tables: &[ONE],
-    channels: &[],
-    children: &[],
-    expiries: &[],
-    steps: &[Step::Create(&[ONE])],
-};
+const TASKS: Domain = Domain::new("tasks", "tasks", &[ONE], &[Step::Create(&[ONE])]);
 
 #[tokio::test]
 async fn r1_the_calendar_domain_is_registered_and_the_hull_is_derived() {
@@ -45,7 +37,11 @@ async fn r1_the_calendar_domain_is_registered_and_the_hull_is_derived() {
         .unwrap();
     assert_eq!(doms.len(), 2, "calendar and fs_");
     assert_eq!(doms[0][0], Value::Text("calendar".into()));
-    assert_eq!(doms[0][1], Value::Integer(1), "one step: Create");
+    assert_eq!(
+        doms[0][1],
+        Value::Integer(2),
+        "two steps: Create, then the original rules and the cascade"
+    );
     let cols = c.query("SELECT logical, derived FROM fs_column WHERE domain = 'calendar' AND col = 'when_utc_min'", Vec::new()).await.unwrap();
     assert_eq!(
         cols[0],
@@ -88,7 +84,7 @@ fn r2_a_zone_that_does_not_exist_is_unknown_zone_never_guessed() {
     assert!(check_zones(&ZONED, &["Europe/Berlin".into()]).is_ok());
     assert!(matches!(
         check_zones(&ZONED, &["Mars/Olympus_Mons".into()]),
-        Err(Error::UnknownZone(_))
+        Err(Error::Invalid(_))
     ));
     assert!(
         check_zones(&ZONED, &["/Custom/x".into()]).is_ok(),

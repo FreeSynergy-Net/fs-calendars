@@ -1,5 +1,5 @@
-//! `fs-types` is stricter than the stand-ins of the trait (review L3): an address the stand-in takes and the layer's
-//! type refuses must cost only its own appointment, not the whole import.
+//! `fs-types` is stricter than the stand-ins were (review L3): an address that is no absolute IRI costs only its person
+//! (left out and reported as a loss), never the appointment and never the whole import.
 
 #![allow(clippy::many_single_char_names, clippy::assert_is_empty)]
 
@@ -15,7 +15,7 @@ fn event(uid: &str, attendee: &str) -> String {
 }
 
 #[tokio::test]
-async fn an_address_that_only_the_stand_in_accepts_costs_only_its_appointment() {
+async fn an_address_that_is_no_iri_costs_only_its_person() {
     let e = ex().await;
     let text = format!(
         "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//self-written//strict//EN\r\n{}{}{}{}END:VCALENDAR\r\n",
@@ -28,13 +28,21 @@ async fn an_address_that_only_the_stand_in_accepts_costs_only_its_appointment() 
         event("plain", ""),
     );
     let r = import_text(&e, &text, ICS_TYPE).await;
-    assert_eq!(r.created.len(), 2, "good and plain are created: {r:?}");
-    assert_eq!(r.failed.len(), 2, "one report per bad appointment: {r:?}");
+    assert_eq!(r.created.len(), 4, "all four are created: {r:?}");
     assert!(
-        r.failed
-            .iter()
-            .all(|p| p.field == "calendar_participant.who_id"),
-        "the layer refuses the address, the appointment is reported as failed: {r:?}"
+        r.failed.is_empty(),
+        "an address costs only its person: {r:?}"
+    );
+    let left_out: Vec<&str> = r
+        .lost
+        .iter()
+        .filter(|l| l.reason == "address.unsupported")
+        .filter_map(|l| l.uid.as_deref())
+        .collect();
+    assert_eq!(
+        left_out,
+        ["bad1@example.org", "bad2@example.org"],
+        "the person with a bad address is left out and reported, never dropped quietly: {r:?}"
     );
     for id in &r.created {
         assert!(e.local.get(*id).await.unwrap().is_some());

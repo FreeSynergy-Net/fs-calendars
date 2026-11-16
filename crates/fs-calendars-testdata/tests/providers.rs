@@ -135,7 +135,10 @@ async fn the_people_directory_finds_and_proposes_in_one_batch() {
         .await
         .unwrap();
     assert_eq!(hits, vec![person(2)]);
-    assert_eq!(dir.display(&hits[0]).unwrap().0, "Marek Linde");
+    assert_eq!(
+        dir.display(&hits[0]).await.unwrap().unwrap().0,
+        "Marek Linde"
+    );
     assert!(
         dir.find_by_address(&address("mailto:new@example.org"))
             .await

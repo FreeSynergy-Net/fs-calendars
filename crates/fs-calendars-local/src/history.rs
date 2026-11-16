@@ -5,9 +5,8 @@
 use fs_calendars_testdata::draft::{Error, HistoryEntry, ObjectId, Page, Place, Result, Utc};
 use fs_objects::v5::log::{Kind, changes_of};
 
-use crate::bridge::{adapt, kind_back};
-use crate::bridge_values::change_back;
 use crate::codec::{get_int, get_text, id_value, int, person_of, text};
+use crate::convert::{adapt, change_back, kind_back};
 use crate::envelope::state;
 use crate::store::Conn;
 
@@ -42,7 +41,7 @@ pub async fn history(
             .map_err(adapt)?
             .iter()
             .map(change_back)
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Vec<_>>();
         items.push(HistoryEntry {
             at: Utc::from_millis(get_int(row, 5)?),
             actor: person_of(row, 2)?,

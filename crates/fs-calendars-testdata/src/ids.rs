@@ -2,7 +2,9 @@
 //!
 //! Pattern: none (pure functions).
 
-use crate::draft::{Attendee, ObjectId, Participant, PersonArt, PersonRef, Reference};
+use crate::draft::{
+    Attendee, ObjectId, Participant, PersonArt, PersonRef, Reference, Restorable, Utc,
+};
 
 /// The object id with the number `n` (big-endian in the last eight bytes).
 #[must_use]
@@ -51,5 +53,14 @@ pub fn actor(p: &Participant) -> Option<&PersonRef> {
     match &p.who {
         Attendee::Actor(person) => Some(person),
         Attendee::Resource(_) | Attendee::Location(_) => None,
+    }
+}
+
+/// The end of a `Restorable` that has one: `Until(t)` and `Held(Some(t))`; `None` for `Manual` and `Held(None)`.
+#[must_use]
+pub fn end_of(r: Restorable) -> Option<Utc> {
+    match r {
+        Restorable::Until(t) | Restorable::Held(Some(t)) => Some(t),
+        _ => None,
     }
 }

@@ -13,6 +13,7 @@ mod common;
 use common::fx;
 use common::series::{title, weekly};
 use fs_calendars_local::fields::{diff, flatten};
+use fs_calendars_testdata::draft::Recurrence;
 use fs_calendars_testdata::draft::{
     AppointmentPatch, Appointments, ByMonth, Frequency, NDay, RecurrenceRule, RuleEnd, SeriesScope,
     Skip, Value, Weekday,
@@ -25,7 +26,7 @@ fn with(f: impl FnOnce(&mut RecurrenceRule)) -> AppointmentPatch {
     r.end = RuleEnd::Count(5);
     f(&mut r);
     AppointmentPatch {
-        recurrence: Some(vec![r]),
+        recurrence: Some(vec![Recurrence::Rule(r)]),
         ..AppointmentPatch::default()
     }
 }

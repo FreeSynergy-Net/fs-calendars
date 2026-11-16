@@ -14,6 +14,7 @@ use fs_calendars_testdata::draft::{
     Appointment, AppointmentPatch, AppointmentQuery, Appointments, BasicValue, Error, Frequency,
     LocalDateTime, Relation, RuleEnd, SeriesScope, Window,
 };
+use fs_calendars_testdata::draft::{Recurrence, Restorable};
 use fs_calendars_testdata::sample::{at, rule, timed};
 use fs_calendars_testdata::zone::iana;
 
@@ -90,7 +91,7 @@ async fn the_rules_are_stored_and_the_window_resolves_the_series() {
 async fn an_endless_series_stays_visible_far_ahead() {
     let f = fx().await;
     let mut d = f.draft("immer", timed(rid(2), "Europe/Berlin", 60));
-    d.rest.recurrence = Some(vec![rule(Frequency::Weekly)]);
+    d.rest.recurrence = Some(vec![Recurrence::Rule(rule(Frequency::Weekly))]);
     f.p.create(d).await.unwrap();
     let w =
         f.p.window(
@@ -169,8 +170,8 @@ async fn deleting_one_occurrence_and_restoring_it() {
     let a = weekly(&f).await;
     let d = f.p.delete(a.id, a.revision, this(16)).await.unwrap();
     assert_eq!(
-        d.restorable_until,
-        Some(utc(ms(2026, 11, 16, 10, 0) + 30 * common::DAY))
+        d.restorable,
+        Restorable::Until(utc(ms(2026, 11, 16, 10, 0) + 30 * common::DAY))
     );
     assert_eq!(starts(&days(&f).await), ["1", "8", "22", "29"]);
     let g = f.p.get(a.id).await.unwrap().unwrap();

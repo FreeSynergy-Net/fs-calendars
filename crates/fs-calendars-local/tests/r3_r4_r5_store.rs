@@ -5,6 +5,7 @@
 mod common;
 
 use common::{Fx, fx, ms, utc};
+use fs_calendars_testdata::draft::Restorable;
 use fs_calendars_testdata::draft::{
     Alert, AlertAction, AppointmentPatch, Appointments, Attendee, Error, Participant,
     ParticipationStatus, RelativeTo, Revision, Roles, SeriesScope, Trigger,
@@ -138,8 +139,8 @@ async fn r4_trash_keeps_everything_and_restore_brings_it_back() {
     );
     assert!(f.p.get(a.id).await.unwrap().is_none());
     assert_eq!(
-        d.restorable_until,
-        Some(utc(ms(2026, 11, 16, 10, 0) + 30 * common::DAY))
+        d.restorable,
+        Restorable::Until(utc(ms(2026, 11, 16, 10, 0) + 30 * common::DAY))
     );
     let back = f.p.restore(a.id, SeriesScope::Whole).await.unwrap();
     assert_eq!(back.participants.len(), 2);

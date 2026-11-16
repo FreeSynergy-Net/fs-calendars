@@ -7,8 +7,8 @@
 #![allow(clippy::too_many_lines, clippy::large_enum_variant)]
 
 use fs_calendars_testdata::draft::{
-    AppointmentPatch, BasicValue, ImportContext, LocalDateTime, Loss, ParticipationStatus,
-    RecurrenceRule, Result, Roles, TextType, When,
+    AppointmentPatch, ImportContext, LocalDateTime, Loss, ParticipationStatus, Recurrence, Result,
+    Roles, TextType, When,
 };
 use fs_calendars_testdata::recur::check;
 use serde_json::Value;
@@ -130,16 +130,18 @@ pub fn read_event(v: &Value, ctx: &ImportContext) -> Result<Read> {
             .into_iter()
             .flatten(),
     );
-    let (mut read, mut unread): (Vec<RecurrenceRule>, bool) = (Vec::new(), false);
+    let (mut read, mut unread): (Vec<Recurrence>, bool) = (Vec::new(), false);
     for r in rules {
-        match rule_from_json(r).filter(|x| check(x).is_empty()) {
-            Some(x) => read.push(x),
-            None => unread = true,
+        if let Some(x) = rule_from_json(r).filter(|x| check(x).is_empty()) {
+            read.push(Recurrence::Rule(x));
+        } else {
+            // A rule outside the subset is kept as its RRULE text (R1, ADR 0030), never dropped.
+            read.push(Recurrence::Original(crate::jscal_rrule::rrule_of_json(r)));
+            unread = true;
         }
     }
     if unread {
         losses.push(Loss { uid: Some(uid.clone()), field: "recurrence".into(), reason: "Serie nur teilweise darstellbar: the rule is outside what is expanded; kept as written, only the first occurrence is shown".into() });
-        read.clear();
     }
     rest.recurrence = Some(read);
     if v.get("excludedRecurrenceRules").is_some() {

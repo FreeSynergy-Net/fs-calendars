@@ -61,6 +61,14 @@ impl<'a> Cx<'a> {
         self.ensure(ok, rule);
     }
 
+    /// Whether the provider offers all of these capabilities.
+    pub(crate) fn offers(&self, names: &[&str]) -> bool {
+        let caps = self.dir.capabilities().0;
+        names
+            .iter()
+            .all(|n| caps.iter().any(|(c, on)| c == n && *on))
+    }
+
     /// A calendar named `Zzconf <name>` owned by the asker.
     pub(crate) async fn calendar(&mut self, name: &str) -> Option<CalendarInfo> {
         let made = self

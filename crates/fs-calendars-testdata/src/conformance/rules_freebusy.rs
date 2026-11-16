@@ -75,7 +75,7 @@ pub(super) async fn free_busy(cx: &mut Cx<'_>) {
             && all.get(3).map(|a| &a.answer) == Some(&FreeBusyAnswer::Unknown),
         "free_busy: a guest profile or a foreign resource that the provider does not lead is Unknown",
     );
-    if cx.fx.share_with_asker(&stranger) {
+    if cx.fx.share_with_asker(&stranger).await {
         let r = dir.free_busy(&[stranger], utc(1), utc(8), &cx.berlin).await;
         cx.ensure(
             matches!(r.as_deref(), Ok([a]) if matches!(&a.answer, FreeBusyAnswer::Busy(_))),

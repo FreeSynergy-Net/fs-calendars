@@ -768,7 +768,7 @@ dependencies = [
  "chrono",
  "fs-calendars-testdata",
  "fs-jscalendar 0.0.2",
- "fs-objects 0.0.2",
+ "fs-objects 0.0.3",
  "fs-types",
  "serde_json",
  "tokio",
@@ -907,8 +907,8 @@ dependencies = [
 
 [[package]]
 name = "fs-objects"
-version = "0.0.2"
-source = "git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.2#cad3c46f436489712aa90c3268b3008ce43e8a2e"
+version = "0.0.3"
+source = "git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.3#86eab3a1deb0b742fe76b9469cd3d2b999c5dfd6"
 dependencies = [
  "async-trait",
  "base64",

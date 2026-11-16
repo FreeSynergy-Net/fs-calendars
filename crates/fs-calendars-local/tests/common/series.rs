@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use super::{Fx, ms, utc};
+use fs_calendars_testdata::draft::Recurrence;
 use fs_calendars_testdata::draft::{
     Appointment, AppointmentPatch, Appointments, Frequency, LocalDateTime, RuleEnd, SeriesScope,
     Window,
@@ -34,7 +35,7 @@ pub async fn weekly(f: &Fx) -> Appointment {
     let mut d = f.draft("Montag", timed(rid(2), "Europe/Berlin", 60));
     let mut r = rule(Frequency::Weekly);
     r.end = RuleEnd::Count(5);
-    d.rest.recurrence = Some(vec![r]);
+    d.rest.recurrence = Some(vec![Recurrence::Rule(r)]);
     f.p.create(d).await.unwrap()
 }
 

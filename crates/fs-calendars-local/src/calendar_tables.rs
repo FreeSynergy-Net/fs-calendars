@@ -176,10 +176,12 @@ const fn value_table(name: &'static str) -> Table {
     }
 }
 
-pub use crate::series_tables::{CUT, CUT_RULE, OVERRIDE, RELATED, RULE, RULE_PART, UNREAD};
+pub use crate::series_tables::{
+    CASCADE, CUT, CUT_RULE, OVERRIDE, RELATED, RULE, RULE_ORIGINAL, RULE_PART, UNREAD,
+};
 
-/// All tables of the domain, parents first.
-pub const ALL: [Table; 13] = [
+/// The tables of step 1 of the domain, parents first (as they were: the step fingerprint is stored in every store).
+pub const STEP1: [Table; 13] = [
     COLLECTION,
     APPOINTMENT,
     PARTICIPANT,
@@ -194,3 +196,19 @@ pub const ALL: [Table; 13] = [
     CUT_RULE,
     UNREAD,
 ];
+
+/// The tables of step 2: the original rules and the cascade of a deleted calendar.
+pub const STEP2: [Table; 2] = [RULE_ORIGINAL, CASCADE];
+
+/// The tables after the last step: those of step 1 and of step 2.
+pub const ALL: [Table; 15] = {
+    let mut t = [UNREAD; 15];
+    let mut i = 0;
+    while i < STEP1.len() {
+        t[i] = STEP1[i];
+        i += 1;
+    }
+    t[STEP1.len()] = RULE_ORIGINAL;
+    t[STEP1.len() + 1] = CASCADE;
+    t
+};

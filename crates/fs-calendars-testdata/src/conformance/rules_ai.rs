@@ -31,7 +31,7 @@ pub(super) async fn ai(cx: &mut Cx<'_>) {
     let _ = dir
         .delete(trashed.id, trashed.revision, SeriesScope::Whole)
         .await;
-    if !(cx.fx.invite_ai(shown.id) && cx.fx.switch_asker(Asker::Owner)) {
+    if !(cx.fx.invite_ai(shown.id).await && cx.fx.switch_asker(Asker::Owner).await) {
         cx.skip("ai: the fixture cannot invite the AI");
         return;
     }
@@ -55,7 +55,7 @@ pub(super) async fn ai(cx: &mut Cx<'_>) {
         "create_calendar: an AI as owner is Forbidden(calendar.create)",
         forbidden("calendar.create"),
     );
-    if !cx.fx.switch_asker(Asker::Ai) {
+    if !cx.fx.switch_asker(Asker::Ai).await {
         cx.skip("ai: the fixture cannot switch the asker to the AI");
         return;
     }
@@ -158,5 +158,5 @@ pub(super) async fn ai(cx: &mut Cx<'_>) {
         ok,
         "free_busy: for an AI a stranger is NotShared, never NotFound",
     );
-    cx.fx.switch_asker(Asker::Owner);
+    cx.fx.switch_asker(Asker::Owner).await;
 }

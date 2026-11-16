@@ -3,8 +3,8 @@
 //! Pattern: Adapter (JSON objects to typed values); what cannot be read is a loss, never dropped quietly.
 
 use fs_calendars_testdata::draft::{
-    Alert, AlertAction, AppointmentPatch, BasicValue, LocalDateTime, Loss, ParticipationStatus,
-    Roles, TextType, Trigger, When,
+    Alert, AlertAction, AppointmentPatch, LocalDateTime, Loss, ParticipationStatus, Roles,
+    TextType, Trigger, When,
 };
 use serde_json::Value;
 

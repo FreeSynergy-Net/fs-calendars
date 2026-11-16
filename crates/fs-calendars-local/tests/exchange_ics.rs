@@ -9,7 +9,7 @@
 mod common;
 
 use common::exchange::{ICS_TYPE, ex, fixture, import_text};
-use fs_calendars_testdata::draft::{Appointments, Attendee, When};
+use fs_calendars_testdata::draft::{Appointments, Attendee, Recurrence, When};
 
 #[tokio::test]
 async fn google_file_is_read_with_its_series_people_and_alert() {
@@ -148,8 +148,9 @@ async fn a_rule_outside_the_subset_is_kept_shown_once_and_reported() {
         .unwrap()
         .unwrap();
     assert!(
-        a.recurrence.is_empty(),
-        "no interpreted rule: the first occurrence shows"
+        matches!(a.recurrence.as_slice(), [Recurrence::Original(t)] if t.contains("BYYEARDAY=1,100,200")),
+        "no interpreted rule, but the rule is kept as text (R1): {:?}",
+        a.recurrence
     );
     let w = e
         .local
@@ -175,7 +176,7 @@ async fn a_rule_outside_the_subset_is_kept_shown_once_and_reported() {
     assert_eq!(
         src.unread,
         ["recurrence"],
-        "only the mark is stored, the rule stays in the original"
+        "the mark is stored; the rule stays in the original file and as text in the row"
     );
     assert!(
         String::from_utf8(src.original.unwrap().0)
@@ -183,8 +184,8 @@ async fn a_rule_outside_the_subset_is_kept_shown_once_and_reported() {
             .contains("BYYEARDAY=1,100,200")
     );
     let edit = fs_calendars_testdata::draft::AppointmentPatch {
-        recurrence: Some(vec![fs_calendars_testdata::sample::rule(
-            fs_calendars_testdata::draft::Frequency::Daily,
+        recurrence: Some(vec![fs_calendars_testdata::draft::Recurrence::Rule(
+            fs_calendars_testdata::sample::rule(fs_calendars_testdata::draft::Frequency::Daily),
         )]),
         ..Default::default()
     };

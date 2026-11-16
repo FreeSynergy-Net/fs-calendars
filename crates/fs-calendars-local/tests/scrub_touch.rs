@@ -7,6 +7,7 @@ mod common;
 
 use common::fx;
 use fs_calendars_testdata::draft::Appointments;
+use fs_calendars_testdata::ids::end_of;
 use turso::Value;
 
 #[tokio::test]
@@ -22,7 +23,7 @@ async fn the_scrub_of_an_expired_cut_touches_the_envelope_of_the_exception() {
     let env = "SELECT name, name_sort, rev, updated FROM objects WHERE type = 'EventException'";
     let before = f.rows(env).await;
     assert_eq!(before[0][0], Value::Text("Geheim".into()));
-    f.set_now(d.restorable_until.unwrap().millis());
+    f.set_now(end_of(d.restorable).unwrap().millis());
     f.p.sweep_expired().await.unwrap();
     let after = f.rows(env).await;
     assert_eq!(after.len(), 1, "changed in place");
@@ -34,7 +35,7 @@ async fn the_scrub_of_an_expired_cut_touches_the_envelope_of_the_exception() {
     assert_eq!(*r1, r0 + 1, "the scrub is a revision of the envelope");
     assert_eq!(
         after[0][3],
-        Value::Integer(d.restorable_until.unwrap().millis()),
+        Value::Integer(end_of(d.restorable).unwrap().millis()),
         "updated is the time of the run"
     );
 }

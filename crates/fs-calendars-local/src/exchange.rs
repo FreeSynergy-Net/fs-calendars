@@ -10,8 +10,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use fs_calendars_testdata::draft::{
     Attendee, BasicValue, Error, Exchange, ExportReport, ExportTarget, FileRef, FormatSupport,
-    ImportContext, ImportReport, Level, MediaType, ObjectId, PersonDirectory, Result,
+    ImportContext, ImportReport, Level, MediaType, ObjectId, Result,
 };
+use fs_calendars_testdata::people::Directory;
 use fs_jscalendar::ical::{Component, parse_entries, split_ics, write_ics};
 use serde_json::Value;
 
@@ -27,7 +28,7 @@ const PROD_ID: &str = "-//FreeSynergy//fs-calendars//EN";
 /// The exchange of one local store.
 pub struct LocalExchange {
     pub(crate) local: Arc<LocalAppointments>,
-    pub(crate) people: Arc<dyn PersonDirectory>,
+    pub(crate) people: Arc<dyn Directory>,
     pub(crate) files: Arc<dyn FileStore>,
 }
 
@@ -35,7 +36,7 @@ impl LocalExchange {
     #[must_use]
     pub fn new(
         local: Arc<LocalAppointments>,
-        people: Arc<dyn PersonDirectory>,
+        people: Arc<dyn Directory>,
         files: Arc<dyn FileStore>,
     ) -> Self {
         Self {

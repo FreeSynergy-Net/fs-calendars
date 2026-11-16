@@ -6,8 +6,8 @@
 use chrono::Duration;
 use fs_calendars_testdata::draft::{
     Appointment, AppointmentPatch, Error, FieldChange, HistoryKind, LocalDateTime, ObjectId,
-    Override, OverrideChange, PersonRef, Related, Relation, Result, Revision, RuleEnd, Utc,
-    Value as Val,
+    Override, OverrideChange, PersonRef, Recurrence, Related, Relation, Result, Revision, RuleEnd,
+    Utc, Value as Val,
 };
 use fs_calendars_testdata::instances::{series_start, when_at};
 use fs_calendars_testdata::patch::{apply, merge};
@@ -48,7 +48,7 @@ pub async fn live(c: &Conn<'_>, id: ObjectId, expected: Revision) -> Result<Load
 pub fn marked(rid: LocalDateTime, what: &str) -> FieldChange {
     FieldChange {
         field: "override".to_owned(),
-        row_key: Some(fs_calendars_testdata::draft::BasicValue::canonical(&rid)),
+        row_key: Some(rid.canonical()),
         old: None,
         new: Some(Val::Text(what.to_owned())),
     }
@@ -92,7 +92,7 @@ pub async fn update_this(
             .into_iter()
             .map(|mut ch| {
                 ch.field = format!("override.{}", ch.field);
-                ch.row_key = Some(fs_calendars_testdata::draft::BasicValue::canonical(&rid));
+                ch.row_key = Some(rid.canonical());
                 ch
             }),
     );
@@ -147,9 +147,11 @@ pub async fn update_following(
         .retain(|o| naive(o.recurrence_id).is_some_and(|n| n >= at));
     // Every rule counts its own occurrences: the part of a `Count` that lies before the split stays with the head.
     for (t, r) in tail.recurrence.iter_mut().zip(&cur.recurrence) {
-        if let RuleEnd::Count(n) = t.end {
-            let before = occurrences(r, start, at - Duration::seconds(1)).len();
-            t.end = RuleEnd::Count(n.saturating_sub(u32::try_from(before).unwrap_or(u32::MAX)));
+        if let (Recurrence::Rule(t), Recurrence::Rule(r)) = (t, r) {
+            if let RuleEnd::Count(n) = t.end {
+                let before = occurrences(r, start, at - Duration::seconds(1)).len();
+                t.end = RuleEnd::Count(n.saturating_sub(u32::try_from(before).unwrap_or(u32::MAX)));
+            }
         }
     }
     tail.related.retain(|r| r.relation != Relation::First);

@@ -45,7 +45,7 @@ pub async fn fx() -> Fx {
         .await
         .unwrap();
     let cal = p
-        .create_calendar("Persönlich", Some("#336699"), None)
+        .create_calendar("Persönlich", Some("#336699"), None, None)
         .await
         .unwrap()
         .id;

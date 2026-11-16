@@ -5,7 +5,9 @@
 mod common;
 
 use common::fx;
+use fs_calendars_testdata::draft::Recurrence;
 use fs_calendars_testdata::draft::{Appointments, Error, SeriesScope};
+use fs_calendars_testdata::ids::end_of;
 use fs_calendars_testdata::sample::{at, timed};
 use turso::Value;
 
@@ -100,7 +102,7 @@ async fn the_trash_period_must_be_positive_and_series_go_with_their_exceptions()
     let mut r =
         fs_calendars_testdata::sample::rule(fs_calendars_testdata::draft::Frequency::Weekly);
     r.end = fs_calendars_testdata::draft::RuleEnd::Count(3);
-    d.rest.recurrence = Some(vec![r]);
+    d.rest.recurrence = Some(vec![Recurrence::Rule(r)]);
     let s = f.p.create(d).await.unwrap();
     let scope = SeriesScope::This {
         recurrence_id: at(2026, 11, 9, 9, 0),
@@ -151,13 +153,13 @@ async fn the_period_run_forgets_expired_cuts_and_their_hidden_exceptions() {
         3,
         "two masters, the exception and nothing else yet"
     );
-    f.set_now(d.restorable_until.unwrap().millis() - 1);
+    f.set_now(end_of(d.restorable).unwrap().millis() - 1);
     assert_eq!(
         f.p.sweep_expired().await.unwrap(),
         fs_calendars_local::sweep::Swept::default(),
         "not over yet"
     );
-    f.set_now(d.restorable_until.unwrap().millis());
+    f.set_now(end_of(d.restorable).unwrap().millis());
     let swept = f.p.sweep_expired().await.unwrap();
     assert_eq!(
         (swept.cuts, swept.hidden),
@@ -207,7 +209,7 @@ async fn the_period_run_removes_the_fields_of_a_deleted_changed_occurrence() {
     let d = f.p.delete(a.id, u.revision, this(9)).await.unwrap();
     assert_eq!(f.count("calendar_override_field").await, 1);
     let ids_before = f.rows("SELECT id FROM objects ORDER BY id").await;
-    f.set_now(d.restorable_until.unwrap().millis());
+    f.set_now(end_of(d.restorable).unwrap().millis());
     let swept = f.p.sweep_expired().await.unwrap();
     assert_eq!((swept.cuts, swept.scrubbed), (1, 1));
     assert_eq!(f.count("calendar_override_field").await, 0);
@@ -248,7 +250,7 @@ async fn the_period_run_leaves_no_trace_of_the_changed_title_in_the_envelope_or_
         [[turso::Value::Text("Geheim|geheim".into())]],
         "before the run the envelope still names the change (restore needs it)"
     );
-    f.set_now(d.restorable_until.unwrap().millis());
+    f.set_now(end_of(d.restorable).unwrap().millis());
     f.p.sweep_expired().await.unwrap();
     assert_eq!(
         f.rows(name).await,

@@ -7,8 +7,8 @@ use std::collections::HashMap;
 
 use fs_calendars_testdata::draft::{
     Appointment, AppointmentQuery, AppointmentSummary, Attendee, BasicValue, Damaged, Error,
-    Instance, ObjectId, Page, ParticipationStatus, PersonRef, Place, Result, Utc, Window, Zone,
-    ZoneKind,
+    Instance, ObjectId, Page, ParticipationStatus, PersonRef, Place, Problem, Restorable, Result,
+    Trash, TypeProblem, Utc, Window, Zone, ZoneKind,
 };
 use fs_calendars_testdata::instances::in_window;
 use fs_calendars_testdata::zone::bounds;
@@ -20,8 +20,7 @@ use crate::read::{fill, fill_series, head, select_with};
 use crate::store::Conn;
 use crate::words::{PARTICIPATION, from_word};
 
-const RULES: &str =
-    "(SELECT count(*) FROM calendar_rule r WHERE r.appointment = t.id AND r.excluded = 0)";
+const RULES: &str = "((SELECT count(*) FROM calendar_rule r WHERE r.appointment = t.id AND r.excluded = 0) + (SELECT count(*) FROM calendar_rule_original r WHERE r.appointment = t.id AND r.excluded = 0))";
 
 fn calendars_in(calendars: &[ObjectId], sql: &mut String, params: &mut Vec<Value>) {
     if !calendars.is_empty() {
@@ -64,14 +63,17 @@ pub async fn list(
     q: &AppointmentQuery,
     after: Option<&Place>,
     size: usize,
+    now: i64,
 ) -> Result<Page<AppointmentSummary>> {
     let mut sql = format!(
         "{} WHERE t.master IS NULL",
         select_with(&format!(", {RULES}"))
     );
     let mut params: Vec<Value> = Vec::new();
-    if !q.include_deleted {
-        sql.push_str(" AND o.deleted IS NULL");
+    match q.trash {
+        Trash::Exclude => sql.push_str(" AND o.deleted IS NULL"),
+        Trash::Include => {}
+        Trash::Only => sql.push_str(" AND o.deleted IS NOT NULL"),
     }
     calendars_in(&q.calendars, &mut sql, &mut params);
     if let Some(t) = &q.text {
@@ -112,6 +114,10 @@ pub async fn list(
             id_text(l.appt.id)
         )));
         let a = &l.appt;
+        let trash = match l.purge_after.filter(|_| l.deleted.is_some()) {
+            Some(end) => Some(restorable_of(c, a, end, now).await?),
+            None => None,
+        };
         items.push(AppointmentSummary {
             id: a.id,
             calendar: a.calendar,
@@ -120,7 +126,7 @@ pub async fn list(
             when: a.when.clone(),
             recurring: get_int(row, n + 3)? > 0,
             revision: a.revision,
-            restorable_until: l.purge_after.map(Utc::from_millis),
+            trash,
         });
     }
     Ok(Page {
@@ -165,7 +171,7 @@ fn plain(
 /// occurrence. D2: all-day and floating rows are found through the widened UTC hull, then placed exactly.
 ///
 /// # Errors
-/// `UnknownZone` for a custom `view_zone`; any other fault costs only the occurrence it touches (`Window::damaged`).
+/// `Invalid` (`zone.bad`, field `view_zone`) for a custom `view_zone`; any other fault costs only the occurrence it touches (`Window::damaged`).
 pub async fn window(
     c: &Conn<'_>,
     from: Utc,
@@ -175,7 +181,10 @@ pub async fn window(
     me: &PersonRef,
 ) -> Result<Window> {
     if view.kind() == ZoneKind::Custom {
-        return Err(Error::UnknownZone(view.id().to_owned()));
+        return Err(Error::Invalid(vec![Problem::from_type(
+            "view_zone",
+            TypeProblem::BadZone,
+        )]));
     }
     let extra = format!(
         ", (SELECT count(*) FROM calendar_participant p WHERE p.appointment = t.id), (SELECT p.status FROM calendar_participant p WHERE p.appointment = t.id AND p.who_kind = 'actor' AND p.who_id = ? LIMIT 1), {RULES}"
@@ -237,4 +246,13 @@ pub async fn window(
         )
     });
     Ok(out)
+}
+
+/// What `restorable` says for a trashed appointment: its own retention, and its calendar's when it went with it.
+async fn restorable_of(c: &Conn<'_>, a: &Appointment, end: i64, now: i64) -> Result<Restorable> {
+    let mut ids = vec![a.id];
+    if let Some(cal) = crate::calendar_trash::cascaded_from(c, a.id).await? {
+        ids.push(cal);
+    }
+    crate::restorable::restorable(c, &ids, end, now).await
 }

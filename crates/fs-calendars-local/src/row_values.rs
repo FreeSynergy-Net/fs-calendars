@@ -32,7 +32,11 @@ pub fn series_end(a: &Appointment) -> Result<Option<i64>> {
     if a.recurrence.is_empty() {
         return Ok(Some(own_end));
     }
-    if a.recurrence.iter().any(|r| r.end == RuleEnd::Never) {
+    // A rule kept as text cannot be computed: the series is treated as endless.
+    if a.recurrence
+        .iter()
+        .any(|r| r.rule().is_none_or(|x| x.end == RuleEnd::Never))
+    {
         return Ok(None);
     }
     let Some(start) = series_start(&a.when) else {
@@ -44,6 +48,7 @@ pub fn series_end(a: &Appointment) -> Result<Option<i64>> {
     let last = a
         .recurrence
         .iter()
+        .filter_map(|r| r.rule())
         .filter_map(|r| occurrences(r, start, far).into_iter().max())
         .max();
     Ok(Some(match last {

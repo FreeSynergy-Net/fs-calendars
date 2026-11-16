@@ -10,11 +10,13 @@
     clippy::many_single_char_names
 )]
 
-pub mod bridge;
-pub mod bridge_values;
+pub mod calendar_ops;
 pub mod calendar_tables;
+pub mod calendar_trash;
+pub mod calendar_update;
 pub mod clock;
 pub mod codec;
+pub mod convert;
 pub mod cuts;
 pub mod envelope;
 pub mod exchange;
@@ -28,6 +30,7 @@ pub mod import_ops;
 pub mod jscal_in;
 pub mod jscal_out;
 pub mod jscal_parts;
+pub mod jscal_rrule;
 pub mod jscal_rule;
 pub mod jscal_time;
 pub mod jscal_util;
@@ -35,11 +38,14 @@ pub mod ops;
 pub mod origin;
 pub mod provider;
 pub mod provider_admin;
+pub mod provider_open;
 pub mod query;
 pub mod read;
 pub mod read_children;
 pub mod registry;
+pub mod restorable;
 pub mod row_values;
+pub mod rule_words;
 pub mod rules;
 pub mod scope_delete;
 pub mod scope_ops;

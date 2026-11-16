@@ -34,7 +34,7 @@ pub async fn ex() -> Ex {
         .unwrap(),
     );
     let cal = local
-        .create_calendar("Import", None, None)
+        .create_calendar("Import", None, None, None)
         .await
         .unwrap()
         .id;

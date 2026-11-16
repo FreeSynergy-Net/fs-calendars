@@ -6,6 +6,7 @@
 mod common;
 
 use common::exchange::{Ex, ICS_TYPE, JSCAL_TYPE, ex, export_text, fixture, import_text};
+use fs_calendars_testdata::draft::Recurrence;
 use fs_calendars_testdata::draft::{
     Appointment, AppointmentPatch, Appointments, Frequency, RuleEnd, SeriesScope, When,
 };
@@ -94,7 +95,7 @@ async fn jscalendar_and_ics_carry_the_same_event_both_ways() {
         e.fx.draft("Runde", timed(at(2026, 11, 2, 9, 0), "Europe/Berlin", 90));
     let mut r = rule(Frequency::Weekly);
     r.end = RuleEnd::Count(5);
-    d.rest.recurrence = Some(vec![r]);
+    d.rest.recurrence = Some(vec![Recurrence::Rule(r)]);
     d.rest.keywords = Some(vec!["a".into(), "b".into()]);
     d.rest.description = Some(("Text".into(), fs_calendars_testdata::draft::TextType::Plain));
     let a = e.local.create(d).await.unwrap();
@@ -144,7 +145,7 @@ async fn a_deleted_changed_occurrence_is_only_an_exdate_in_the_export() {
         e.fx.draft("Serie", timed(at(2026, 11, 2, 9, 0), "Europe/Berlin", 60));
     let mut r = rule(Frequency::Weekly);
     r.end = RuleEnd::Count(4);
-    d.rest.recurrence = Some(vec![r]);
+    d.rest.recurrence = Some(vec![Recurrence::Rule(r)]);
     let a = e.local.create(d).await.unwrap();
     let this = SeriesScope::This {
         recurrence_id: at(2026, 11, 9, 9, 0),
@@ -252,8 +253,8 @@ async fn a_series_outside_the_subset_keeps_exdate_and_exceptions_through_an_edit
     );
     let a = e.local.get(r.created[0]).await.unwrap().unwrap();
     assert!(
-        a.overrides.is_empty() && a.recurrence.is_empty(),
-        "shown as its first occurrence"
+        a.overrides.is_empty() && matches!(a.recurrence.as_slice(), [Recurrence::Original(_)]),
+        "shown as its first occurrence, the rule kept as text (R1)"
     );
     e.local
         .update(

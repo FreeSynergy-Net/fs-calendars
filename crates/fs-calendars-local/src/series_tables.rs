@@ -88,6 +88,34 @@ pub const RULE_PART: Table = Table {
     indexes: &[],
 };
 
+/// The original text of a recurrence rule the program cannot compute with (`Recurrence::Original`, ADR 0030, R1):
+/// byte for byte, in the position `seq` of the list (step 2 of the domain). The same position never holds a typed
+/// rule in `calendar_rule`.
+pub const RULE_ORIGINAL: Table = Table {
+    name: "calendar_rule_original",
+    cols: &[
+        Col::req("appointment", Ref),
+        Col::req("excluded", Bool),
+        Col::req("seq", Int),
+        Col::req("rrule", Text),
+    ],
+    constraints: &["PRIMARY KEY (appointment, excluded, seq)", RULE_FK],
+    indexes: &[],
+};
+
+/// Which appointments went to the trash WITH their calendar (and so only come back with it): an appointment deleted
+/// earlier is not in here and keeps its own deadline (step 2 of the domain).
+pub const CASCADE: Table = Table {
+    name: "calendar_cascade",
+    cols: &[Col::req("appointment", Ref), Col::req("collection", Ref)],
+    constraints: &[
+        "PRIMARY KEY (appointment)",
+        "FOREIGN KEY (appointment) REFERENCES calendar_appointment(id) ON DELETE CASCADE",
+        "FOREIGN KEY (collection) REFERENCES calendar_collection(id) ON DELETE CASCADE",
+    ],
+    indexes: &[],
+};
+
 /// Which fields an exception row sets (the rest is inherited from the master).
 pub const OVERRIDE: Table = Table {
     name: "calendar_override_field",

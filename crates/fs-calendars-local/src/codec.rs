@@ -12,7 +12,7 @@ use fs_calendars_testdata::zone::{local, naive, naive_date, plain};
 use fs_objects::v5::codec as layer;
 use turso::Value;
 
-use crate::bridge::adapt;
+use crate::convert::adapt;
 
 // What does not touch a trait type is the layer's own code (one place): rows and engine values.
 pub use layer::{Row, boolean, int, opt_int, opt_text, text};

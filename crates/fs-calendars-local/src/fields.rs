@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use fs_calendars_testdata::draft::{
     Alert, Appointment, AppointmentPatch, Attendee, FieldChange, OverrideChange, Participant,
-    Trigger, Value as Val, When,
+    Recurrence, Trigger, Value as Val, When,
 };
 
 use crate::words::{
@@ -70,10 +70,17 @@ pub fn flatten(a: &Appointment) -> Flat {
     a.participants.iter().for_each(|p| participant(&mut f, p));
     a.alerts.iter().for_each(|x| alert(&mut f, x));
     for (ex, rules) in [("r", &a.recurrence), ("x", &a.excluded_recurrence)] {
-        rules
-            .iter()
-            .enumerate()
-            .for_each(|(i, r)| crate::fields_rule::rule(&mut f, &format!("{ex}{i}"), r));
+        rules.iter().enumerate().for_each(|(i, r)| match r {
+            Recurrence::Rule(r) => crate::fields_rule::rule(&mut f, &format!("{ex}{i}"), r),
+            Recurrence::Original(rrule) => {
+                put(
+                    &mut f,
+                    "rule.original",
+                    Some(&format!("{ex}{i}")),
+                    Val::Text(rrule.clone()),
+                );
+            }
+        });
     }
     for r in &a.related {
         put(

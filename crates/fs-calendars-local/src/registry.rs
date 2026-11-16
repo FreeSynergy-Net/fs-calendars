@@ -1,7 +1,7 @@
 //! The calendar's `Domain` for the shared layer (R1): prefix, tables, steps, dependent objects, deadlines, channels.
 //!
 //! Pattern: Registry (a program reports its table family once; the layer creates the tables, writes them down and
-//! runs the steps that are missing). The calendar has one step, `Create`; a later change is a new step appended, with
+//! runs the steps that are missing). The calendar has two steps, both `Create`; a later change is a new step appended, with
 //! a fixture test (ADR 0086).
 
 use fs_objects::v5::Step;
@@ -9,7 +9,7 @@ use fs_objects::v5::envelope::Child;
 use fs_objects::v5::purge::Expiry;
 use fs_objects::v5::registry::Domain;
 
-use crate::calendar_tables::{ALL, PREFIX};
+use crate::calendar_tables::{ALL, PREFIX, STEP1, STEP2};
 use crate::sweep::on_cut;
 
 /// The channels `object_origin.channel` may hold in the calendar.
@@ -48,13 +48,13 @@ const EXPIRIES: &[Expiry] = &[Expiry {
     on_expired: Some(on_cut),
 }];
 
-/// The domain of the calendar.
-pub const DOMAIN: Domain = Domain {
-    prefix: PREFIX,
-    about: "calendar: collections, appointments, participants, alerts",
-    tables: &ALL,
-    channels: CHANNELS,
-    children: CHILDREN,
-    expiries: EXPIRIES,
-    steps: &[Step::Create(&ALL)],
-};
+/// The domain of the calendar. Step 2 adds the original text of a recurrence rule (`Recurrence::Original`) and the cascade of a deleted calendar.
+pub const DOMAIN: Domain = Domain::new(
+    PREFIX,
+    "calendar: collections, appointments, participants, alerts",
+    &ALL,
+    &[Step::Create(&STEP1), Step::Create(&STEP2)],
+)
+.with_channels(CHANNELS)
+.with_children(CHILDREN)
+.with_expiries(EXPIRIES);

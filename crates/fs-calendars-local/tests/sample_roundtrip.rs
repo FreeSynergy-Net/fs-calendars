@@ -116,6 +116,6 @@ async fn every_sample_appointment_is_stored_equal_or_refused_by_name() {
             other => panic!("{slug}: expected Unsupported, got {other:?}"),
         }
     }
-    assert_eq!(stored.len(), 43);
-    assert!(f.count("calendar_appointment").await >= 43);
+    assert_eq!(stored.len(), 48);
+    assert!(f.count("calendar_appointment").await >= 48);
 }

@@ -6,7 +6,7 @@
 mod common;
 
 use common::exchange::{ICS_TYPE, ex, import_text};
-use fs_calendars_testdata::draft::{Appointments, BasicValue};
+use fs_calendars_testdata::draft::Appointments;
 
 /// `(rule line, DTSTART date, expected local dates)`; every occurrence is at 09:00 local time.
 type Case = (&'static str, &'static str, &'static [&'static str]);

@@ -3,23 +3,21 @@
 //! Pattern: Transaction script; each write is one transaction over the envelope, the domain rows and the log (R3).
 
 use fs_calendars_testdata::draft::{
-    Appointment, AppointmentDraft, AppointmentPatch, CalendarInfo, Deleted, Error, HistoryKind,
-    ObjectId, PersonRef, Result, Revision, SeriesScope, Utc, Zone,
+    Appointment, AppointmentDraft, AppointmentPatch, Deleted, Error, HistoryKind, ObjectId,
+    PersonRef, Result, Revision, SeriesScope, Utc,
 };
 use fs_calendars_testdata::patch::apply;
 use fs_calendars_testdata::state::blank;
 
-use crate::calendar_tables::COLLECTION;
 use crate::clock::new_id;
-use crate::codec::{id_text, id_value, invalid, person_of, text};
+use crate::codec::{id_text, id_value, invalid, text};
 use crate::envelope::{bump, insert, log, trash, untrash};
 use crate::fields::{diff, flatten};
-use crate::read::{Rd, load};
+use crate::read::load;
 use crate::scope_delete::{delete_partial, restore_partial};
 use crate::scope_ops::{update_following, update_this};
 use crate::store::Conn;
-use crate::write::{validate, write_appointment, write_collection};
-use fs_calendars_testdata::draft::{FieldChange, Value as Val};
+use crate::write::{validate, write_appointment};
 use fs_calendars_testdata::instances::series_start;
 use fs_calendars_testdata::zone::naive;
 
@@ -31,91 +29,6 @@ async fn calendar_exists(c: &Conn<'_>, id: ObjectId) -> Result<bool> {
 async fn must_load(c: &Conn<'_>, id: ObjectId) -> Result<crate::read::Loaded> {
     load(c, "t.id = ? AND t.master IS NULL", vec![id_value(id)])
         .await?
-        .ok_or(Error::NotFound(id))
-}
-
-/// All calendars that are not in the trash.
-///
-/// # Errors
-/// `Unavailable` for a row that does not read back.
-pub async fn calendars(c: &Conn<'_>) -> Result<Vec<CalendarInfo>> {
-    let cols: Vec<String> = COLLECTION
-        .cols
-        .iter()
-        .map(|x| format!("k.{}", x.name))
-        .collect();
-    let rows = c.query(&format!("SELECT {}, o.rev FROM calendar_collection k JOIN objects o ON o.id = k.id WHERE o.deleted IS NULL ORDER BY o.name_sort, k.id", cols.join(", ")), Vec::new()).await?;
-    rows.iter()
-        .map(|row| {
-            let r = Rd {
-                t: &COLLECTION,
-                row,
-            };
-            Ok(CalendarInfo {
-                id: r.id("id")?,
-                name: r.text("name")?,
-                color: r.opt_text("color")?,
-                default_zone: r
-                    .opt_text("default_zone")?
-                    .map(|z| crate::codec::zone_of(&z))
-                    .transpose()?,
-                owner: person_of(row, 4)?,
-                revision: Revision(
-                    u64::try_from(crate::codec::get_int(row, COLLECTION.cols.len())?).unwrap_or(0),
-                ),
-            })
-        })
-        .collect()
-}
-
-/// Create a calendar (envelope, collection row, log) in one transaction.
-///
-/// # Errors
-/// `Invalid` (empty name), `UnknownZone`, or the engine's error.
-pub async fn create_calendar(
-    c: Conn<'_>,
-    owner: &PersonRef,
-    now: i64,
-    name: &str,
-    color: Option<&str>,
-    zone: Option<Zone>,
-) -> Result<CalendarInfo> {
-    let r = create_calendar_in(&c, owner, now, name, color, zone).await;
-    c.finish(r).await
-}
-
-async fn create_calendar_in(
-    c: &Conn<'_>,
-    owner: &PersonRef,
-    now: i64,
-    name: &str,
-    color: Option<&str>,
-    zone: Option<Zone>,
-) -> Result<CalendarInfo> {
-    if name.trim().is_empty() {
-        return Err(invalid("name", "must not be empty"));
-    }
-    if zone.as_ref().is_some_and(crate::write::custom) {
-        return Err(Error::Unsupported {
-            capability: "calendar.create".to_owned(),
-            reason: "custom zones are not stored yet (the calendar_custom_zone tables are missing)"
-                .to_owned(),
-        });
-    }
-    let id = new_id(now)?;
-    insert(c, id, "Calendar", name, owner, now).await?;
-    write_collection(c, id, name, color, zone.as_ref(), owner).await?;
-    let ch = [FieldChange {
-        field: "name".to_owned(),
-        row_key: None,
-        old: None,
-        new: Some(Val::Text(name.to_owned())),
-    }];
-    log(c, id, HistoryKind::Create, owner, now, &ch).await?;
-    calendars(c)
-        .await?
-        .into_iter()
-        .find(|x| x.id == id)
         .ok_or(Error::NotFound(id))
 }
 
@@ -211,7 +124,7 @@ pub async fn update(
         }
         let old = must_load(&c, id).await?;
         if old.deleted.is_some() {
-            return Err(Error::NotFound(id));
+            return Err(crate::calendar_trash::gone(&c, id, old.appt.calendar).await?);
         }
         if old.appt.revision != expected {
             return Err(Error::Changed {
@@ -243,7 +156,7 @@ pub async fn update(
     c.finish(r).await
 }
 
-/// Delete (whole) = trash; `restorable_until` is `purge_after`.
+/// Delete (whole) = trash; `restorable` follows the period and a retention.
 ///
 /// # Errors
 /// `NotFound`, `Changed`, `Unsupported` (series scopes).
@@ -261,14 +174,14 @@ pub async fn delete(
         }
         let old = must_load(&c, id).await?;
         if old.deleted.is_some() {
-            return Err(Error::NotFound(id));
+            return Err(crate::calendar_trash::gone(&c, id, old.appt.calendar).await?);
         }
         let (_, until) = trash(&c, id, expected, now).await?;
         log(&c, id, HistoryKind::Delete, actor, now, &[]).await?;
         Ok(Deleted {
             id,
             scope,
-            restorable_until: Some(Utc::from_millis(until)),
+            restorable: crate::restorable::restorable(&c, &[id], until, now).await?,
         })
     }
     .await;
@@ -288,6 +201,12 @@ pub async fn restore(
 ) -> Result<Appointment> {
     let r = async {
         let l = must_load(&c, id).await?;
+        if crate::calendar_ops::in_trash(&c, l.appt.calendar).await? {
+            return Err(invalid(
+                "calendar",
+                "is in the trash: restore the calendar first",
+            ));
+        }
         if l.deleted.is_none() {
             return restore_partial(&c, actor, now, l.appt, scope).await;
         }

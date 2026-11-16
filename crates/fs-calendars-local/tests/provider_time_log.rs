@@ -6,9 +6,10 @@ mod common;
 
 use common::{DAY, fx, ms, utc};
 use fs_calendars_testdata::draft::{
-    AppointmentPatch, AppointmentQuery, Appointments, Attendee, BasicValue, Error, HistoryKind,
-    Participant, ParticipationStatus, Roles, SeriesScope, Span, Value, When,
+    AppointmentPatch, AppointmentQuery, Appointments, Attendee, Error, HistoryKind, Participant,
+    ParticipationStatus, Roles, SeriesScope, Span, Value, When,
 };
+use fs_calendars_testdata::draft::{Restorable, Trash};
 use fs_calendars_testdata::ids::person;
 use fs_calendars_testdata::sample::{all_day, at, timed};
 use fs_calendars_testdata::zone::{custom, iana};
@@ -88,7 +89,7 @@ async fn the_window_places_floating_and_all_day_per_viewer_and_timed_exactly() {
     );
     let r = f.p.window(from, to, &custom("/Custom/X"), &[]).await;
     assert!(
-        matches!(r, Err(Error::UnknownZone(_))),
+        matches!(r, Err(Error::Invalid(_))),
         "a custom zone is never a view zone"
     );
 }
@@ -152,8 +153,8 @@ async fn trash_period_restore_and_the_setting() {
             .await
             .unwrap();
     assert_eq!(
-        da.restorable_until,
-        Some(utc(ms(2026, 11, 16, 10, 0) + 7 * DAY)),
+        da.restorable,
+        Restorable::Until(utc(ms(2026, 11, 16, 10, 0) + 7 * DAY)),
         "the period of the setting"
     );
     f.exec("UPDATE setting SET int_value = 30 WHERE key = 'trash_days'")
@@ -162,7 +163,7 @@ async fn trash_period_restore_and_the_setting() {
     let listed =
         f.p.list(
             &AppointmentQuery {
-                include_deleted: true,
+                trash: Trash::Include,
                 ..AppointmentQuery::default()
             },
             None,
@@ -172,22 +173,11 @@ async fn trash_period_restore_and_the_setting() {
         .unwrap()
         .items;
     assert_eq!(
-        listed
-            .iter()
-            .find(|s| s.id == a.id)
-            .unwrap()
-            .restorable_until,
-        da.restorable_until,
+        listed.iter().find(|s| s.id == a.id).unwrap().trash,
+        Some(da.restorable),
         "a later change applies only to later deletes"
     );
-    assert_eq!(
-        listed
-            .iter()
-            .find(|s| s.id == b.id)
-            .unwrap()
-            .restorable_until,
-        None
-    );
+    assert_eq!(listed.iter().find(|s| s.id == b.id).unwrap().trash, None);
     assert_eq!(
         f.p.list(&AppointmentQuery::default(), None, 10)
             .await

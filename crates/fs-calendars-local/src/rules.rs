@@ -3,48 +3,21 @@
 //! Pattern: Adapter (rule values to rows and back); the order of a by-list is kept in `pos`.
 
 use fs_calendars_testdata::draft::{
-    ByMonth, Frequency, NDay, ObjectId, RecurrenceRule, Related, Relation, Result, RuleEnd, Skip,
-    Weekday,
+    ByMonth, NDay, ObjectId, Recurrence, RecurrenceRule, Related, Relation, Result, RuleEnd,
 };
 use turso::Value;
 
-use crate::calendar_tables::{RELATED, RULE, RULE_PART};
+use crate::calendar_tables::{RELATED, RULE, RULE_ORIGINAL, RULE_PART};
 use crate::codec::{
     boolean, damaged, get_bool, get_int, get_opt_int, get_opt_text, get_text, id_value, int,
     int_to_local, local_to_int, opt_int, opt_text, text,
 };
+pub use crate::rule_words::{DAYS, FREQ, RELATIONS, SKIPS};
 use crate::store::Conn;
 use crate::words::{Table as Words, from_word, word};
 
-pub const FREQ: [(Frequency, &str); 7] = [
-    (Frequency::Yearly, "yearly"),
-    (Frequency::Monthly, "monthly"),
-    (Frequency::Weekly, "weekly"),
-    (Frequency::Daily, "daily"),
-    (Frequency::Hourly, "hourly"),
-    (Frequency::Minutely, "minutely"),
-    (Frequency::Secondly, "secondly"),
-];
-pub const SKIPS: [(Skip, &str); 3] = [
-    (Skip::Omit, "omit"),
-    (Skip::Backward, "backward"),
-    (Skip::Forward, "forward"),
-];
-pub const DAYS: [(Weekday, &str); 7] = [
-    (Weekday::Mo, "mo"),
-    (Weekday::Tu, "tu"),
-    (Weekday::We, "we"),
-    (Weekday::Th, "th"),
-    (Weekday::Fr, "fr"),
-    (Weekday::Sa, "sa"),
-    (Weekday::Su, "su"),
-];
-pub const RELATIONS: [(Relation, &str); 4] = [
-    (Relation::First, "first"),
-    (Relation::Next, "next"),
-    (Relation::Child, "child"),
-    (Relation::Parent, "parent"),
-];
+/// A rule with its position in the list (`seq`).
+type Placed = Vec<(i64, Recurrence)>;
 
 /// One by-part value: `(part, value, nth, leap)`.
 type Part = (&'static str, i64, Option<i64>, bool);
@@ -102,7 +75,8 @@ fn parts(r: &RecurrenceRule) -> Vec<Part> {
     out
 }
 
-/// Replace the rules (`excluded` = the excluding rules) of an appointment.
+/// Replace the rules (`excluded` = the excluding rules) of an appointment: a typed rule in `calendar_rule`, a rule kept
+/// as written (`Recurrence::Original`) in `calendar_rule_original`, both at their position `seq` of the list.
 ///
 /// # Errors
 /// `Invalid` naming `table.column`, or the engine's error.
@@ -110,15 +84,28 @@ pub async fn write_rules(
     c: &Conn<'_>,
     id: ObjectId,
     excluded: bool,
-    rules: &[RecurrenceRule],
+    rules: &[Recurrence],
 ) -> Result<()> {
-    c.exec(
-        "DELETE FROM calendar_rule WHERE appointment = ? AND excluded = ?",
-        vec![id_value(id), boolean(excluded)],
-    )
-    .await?;
-    for (seq, r) in rules.iter().enumerate() {
+    for t in ["calendar_rule", "calendar_rule_original"] {
+        c.exec(
+            &format!("DELETE FROM {t} WHERE appointment = ? AND excluded = ?"),
+            vec![id_value(id), boolean(excluded)],
+        )
+        .await?;
+    }
+    for (seq, rule) in rules.iter().enumerate() {
         let seq = i64::try_from(seq).unwrap_or(0);
+        let r = match rule {
+            Recurrence::Rule(r) => r,
+            Recurrence::Original(rrule) => {
+                c.insert(
+                    &RULE_ORIGINAL,
+                    vec![id_value(id), boolean(excluded), int(seq), text(rrule)],
+                )
+                .await?;
+                continue;
+            }
+        };
         let (count, until) = match r.end {
             RuleEnd::Never => (Value::Null, Value::Null),
             RuleEnd::Count(n) => (int(i64::from(n)), Value::Null),
@@ -181,12 +168,9 @@ fn narrow<T: TryFrom<i64>>(v: i64) -> Result<T> {
 ///
 /// # Errors
 /// `Unavailable` for a row that does not read back.
-pub async fn read_rules(
-    c: &Conn<'_>,
-    id: ObjectId,
-) -> Result<(Vec<RecurrenceRule>, Vec<RecurrenceRule>)> {
+pub async fn read_rules(c: &Conn<'_>, id: ObjectId) -> Result<(Vec<Recurrence>, Vec<Recurrence>)> {
     let rows = c.query("SELECT excluded, seq, frequency, interval, rscale, skip, first_day_of_week, count, until FROM calendar_rule WHERE appointment = ? ORDER BY excluded, seq", vec![id_value(id)]).await?;
-    let (mut keep, mut out) = (Vec::new(), Vec::new());
+    let (mut keep, mut out): (Placed, Placed) = (Vec::new(), Vec::new());
     for r in &rows {
         let (ex, seq) = (get_bool(r, 0)?, get_int(r, 1)?);
         let end = match (get_opt_int(r, 7)?, get_opt_int(r, 8)?) {
@@ -230,9 +214,32 @@ pub async fn read_rules(
                 _ => return Err(damaged("rule part")),
             }
         }
-        if ex { out.push(rule) } else { keep.push(rule) }
+        let rule = Recurrence::Rule(rule);
+        if ex {
+            out.push((seq, rule));
+        } else {
+            keep.push((seq, rule));
+        }
     }
-    Ok((keep, out))
+    let kept = c
+        .query(
+            "SELECT excluded, seq, rrule FROM calendar_rule_original WHERE appointment = ?",
+            vec![id_value(id)],
+        )
+        .await?;
+    for r in &kept {
+        let (ex, seq) = (get_bool(r, 0)?, get_int(r, 1)?);
+        let rule = Recurrence::Original(get_text(r, 2)?);
+        if ex {
+            out.push((seq, rule));
+        } else {
+            keep.push((seq, rule));
+        }
+    }
+    keep.sort_by_key(|(seq, _)| *seq);
+    out.sort_by_key(|(seq, _)| *seq);
+    let strip = |v: Placed| v.into_iter().map(|(_, r)| r).collect();
+    Ok((strip(keep), strip(out)))
 }
 
 /// Replace the `related` rows.

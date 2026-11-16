@@ -9,8 +9,8 @@ use fs_calendars_testdata::draft::Result;
 use fs_objects::v5;
 use turso::Value;
 
-use crate::bridge::adapt;
 use crate::codec::Row;
+use crate::convert::adapt;
 use crate::registry::DOMAIN;
 use crate::typed::check_zones;
 use fs_objects::v5::spec::Table;

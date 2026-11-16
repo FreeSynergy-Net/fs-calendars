@@ -5,9 +5,9 @@
 mod common;
 
 use common::{fx, ms, utc};
+use fs_calendars_testdata::draft::Trash;
 use fs_calendars_testdata::draft::{
-    AppointmentPatch, AppointmentQuery, Appointments, BasicValue, Error, LocalDateTime, Location,
-    SeriesScope,
+    AppointmentPatch, AppointmentQuery, Appointments, Error, LocalDateTime, Location, SeriesScope,
 };
 use fs_calendars_testdata::sample::{all_day, at, timed};
 use fs_calendars_testdata::zone::iana;
@@ -16,11 +16,11 @@ use fs_calendars_testdata::zone::iana;
 async fn calendars_are_created_listed_and_a_bad_zone_is_refused() {
     let f = fx().await;
     let work =
-        f.p.create_calendar("Arbeit", None, Some(iana("Europe/Berlin")))
+        f.p.create_calendar("Arbeit", None, Some(iana("Europe/Berlin")), None)
             .await
             .unwrap();
     let names: Vec<String> =
-        f.p.calendars()
+        f.p.calendars(Trash::Exclude)
             .await
             .unwrap()
             .into_iter()
@@ -30,16 +30,16 @@ async fn calendars_are_created_listed_and_a_bad_zone_is_refused() {
     assert_eq!(work.default_zone, Some(iana("Europe/Berlin")));
     assert_eq!(work.owner, common::actor());
     assert!(matches!(
-        f.p.create_calendar("X", None, Some(iana("Mars/Base")))
+        f.p.create_calendar("X", None, Some(iana("Mars/Base")), None)
             .await,
-        Err(Error::UnknownZone(_))
+        Err(Error::Invalid(_))
     ));
     assert!(matches!(
-        f.p.create_calendar("  ", None, None).await,
+        f.p.create_calendar("  ", None, None, None).await,
         Err(Error::Invalid(_))
     ));
     assert_eq!(
-        f.p.calendars().await.unwrap().len(),
+        f.p.calendars(Trash::Exclude).await.unwrap().len(),
         2,
         "nothing of the refused ones stays"
     );
@@ -87,7 +87,7 @@ async fn create_checks_before_it_writes() {
     let bad_zone =
         f.p.create(f.draft("x", timed(at(2026, 11, 20, 9, 0), "Mars/Base", 30)))
             .await;
-    assert!(matches!(bad_zone, Err(Error::UnknownZone(_))));
+    assert!(matches!(bad_zone, Err(Error::Invalid(_))));
     assert!(matches!(
         f.p.create(f.draft("  ", timed(at(2026, 11, 20, 9, 0), "Europe/Berlin", 30)))
             .await,
@@ -171,11 +171,16 @@ async fn capabilities_say_what_this_slice_offers() {
         [
             "calendar.read",
             "calendar.create",
+            "calendar.update",
+            "calendar.delete",
+            "calendar.restore",
+            "event.read",
             "event.create",
             "event.update",
             "event.delete",
             "event.restore",
-            "event.history"
+            "event.history",
+            "trash.purge"
         ]
     );
     let _ = AppointmentQuery::default();

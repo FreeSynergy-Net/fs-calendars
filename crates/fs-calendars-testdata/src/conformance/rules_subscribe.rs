@@ -132,7 +132,7 @@ pub(super) async fn address(cx: &mut Cx<'_>) {
         "history: the address is never in the log",
     );
     // Only the owner sees the address.
-    if cx.fx.switch_asker(Asker::Other) {
+    if cx.fx.switch_asker(Asker::Other).await {
         let seen = cx.listed(c.id).await;
         cx.ensure(
             seen.as_ref().is_some_and(
@@ -140,7 +140,7 @@ pub(super) async fn address(cx: &mut Cx<'_>) {
             ),
             "calendars: someone without calendar.update does not see the address",
         );
-        cx.fx.switch_asker(Asker::Owner);
+        cx.fx.switch_asker(Asker::Owner).await;
     } else {
         cx.skip(
             "calendars: the address is hidden from others (the fixture cannot switch the asker)",
@@ -160,10 +160,14 @@ pub(super) async fn address(cx: &mut Cx<'_>) {
 pub(super) async fn feed(cx: &mut Cx<'_>) {
     let dir = cx.dir;
     let address = "https://kalender.example.org/zzconf-feed.ics";
-    if !cx.fx.set_feed(
-        address,
-        &[("zzconf-1", "Zzconf Eins"), ("zzconf-2", "Zzconf Zwei")],
-    ) {
+    if !cx
+        .fx
+        .set_feed(
+            address,
+            &[("zzconf-1", "Zzconf Eins"), ("zzconf-2", "Zzconf Zwei")],
+        )
+        .await
+    {
         cx.skip("feed: the fixture cannot say what a feed delivers");
         return;
     }
@@ -239,7 +243,8 @@ pub(super) async fn feed(cx: &mut Cx<'_>) {
     cx.fails(&r, "respond in a subscription is ReadOnly", &nf);
     // The source drops one and renames the other.
     cx.fx
-        .set_feed(address, &[("zzconf-1", "Zzconf Eins (neu)")]);
+        .set_feed(address, &[("zzconf-1", "Zzconf Eins (neu)")])
+        .await;
     let Ok(r) = dir.refresh_calendar(c.id).await else {
         cx.ensure(false, "refresh_calendar: answers again");
         return;

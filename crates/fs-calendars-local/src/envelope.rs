@@ -12,8 +12,7 @@ use fs_objects::v5::log as layer_log;
 
 pub use layer::{DEFAULT_TRASH_DAYS, State};
 
-use crate::bridge::{adapt, kind, oid, person, rev, rev_back};
-use crate::bridge_values::change;
+use crate::convert::{adapt, change, kind};
 use crate::registry::DOMAIN;
 use crate::store::Conn;
 
@@ -29,8 +28,7 @@ pub async fn insert(
     owner: &PersonRef,
     now: i64,
 ) -> Result<()> {
-    let owner = person(owner)?;
-    layer::insert(c.inner(), oid(id), kind, name, &owner, now)
+    layer::insert(c.inner(), id, kind, name, owner, now)
         .await
         .map_err(adapt)
 }
@@ -40,7 +38,7 @@ pub async fn insert(
 /// # Errors
 /// The engine's error, or a damaged row.
 pub async fn state(c: &Conn<'_>, id: ObjectId) -> Result<Option<State>> {
-    layer::state(c.inner(), oid(id)).await.map_err(adapt)
+    layer::state(c.inner(), id).await.map_err(adapt)
 }
 
 /// Compare-and-set: `rev + 1` only if the row is at `expected` and not in the trash.
@@ -54,9 +52,8 @@ pub async fn bump(
     name: Option<&str>,
     now: i64,
 ) -> Result<Revision> {
-    layer::bump(c.inner(), oid(id), rev(expected), name, now)
+    layer::bump(c.inner(), id, expected, name, now)
         .await
-        .map(rev_back)
         .map_err(adapt)
 }
 
@@ -65,10 +62,7 @@ pub async fn bump(
 /// # Errors
 /// `NotFound` when there is no such row.
 pub async fn touch(c: &Conn<'_>, id: ObjectId, name: Option<&str>, now: i64) -> Result<Revision> {
-    layer::touch(c.inner(), oid(id), name, now)
-        .await
-        .map(rev_back)
-        .map_err(adapt)
+    layer::touch(c.inner(), id, name, now).await.map_err(adapt)
 }
 
 /// The trash period in days: `setting.trash_days`, else 30.
@@ -89,9 +83,8 @@ pub async fn trash(
     expected: Revision,
     now: i64,
 ) -> Result<(Revision, i64)> {
-    layer::trash(c.inner(), oid(id), rev(expected), now)
+    layer::trash(c.inner(), id, expected, now)
         .await
-        .map(|(r, until)| (rev_back(r), until))
         .map_err(adapt)
 }
 
@@ -100,10 +93,7 @@ pub async fn trash(
 /// # Errors
 /// `NotFound` when there is no row or the period is over; `Invalid` when it is not in the trash.
 pub async fn untrash(c: &Conn<'_>, id: ObjectId, now: i64) -> Result<Revision> {
-    layer::untrash(c.inner(), oid(id), now)
-        .await
-        .map(rev_back)
-        .map_err(adapt)
+    layer::untrash(c.inner(), id, now).await.map_err(adapt)
 }
 
 /// Write one log entry with its typed changes (nothing for an object in `unlogged_ids`).
@@ -118,17 +108,10 @@ pub async fn log(
     now: i64,
     changes: &[FieldChange],
 ) -> Result<()> {
-    let changes = changes.iter().map(change).collect::<Result<Vec<_>>>()?;
-    layer_log::log(
-        c.inner(),
-        oid(id),
-        kind(kind_of),
-        &person(actor)?,
-        now,
-        &changes,
-    )
-    .await
-    .map_err(adapt)
+    let changes = changes.iter().map(change).collect::<Vec<_>>();
+    layer_log::log(c.inner(), id, kind(kind_of), actor, now, &changes)
+        .await
+        .map_err(adapt)
 }
 
 /// Log purge (ADR 0029): remove the log of an object, keep the object.
@@ -136,9 +119,7 @@ pub async fn log(
 /// # Errors
 /// `NotFound` when there is no such object.
 pub async fn purge_log(c: &Conn<'_>, id: ObjectId) -> Result<()> {
-    layer_log::purge_log(c.inner(), oid(id))
-        .await
-        .map_err(adapt)
+    layer_log::purge_log(c.inner(), id).await.map_err(adapt)
 }
 
 /// From now on the writes of this object are not logged.
@@ -146,9 +127,7 @@ pub async fn purge_log(c: &Conn<'_>, id: ObjectId) -> Result<()> {
 /// # Errors
 /// `NotFound` when there is no such object.
 pub async fn mark_unlogged(c: &Conn<'_>, id: ObjectId) -> Result<()> {
-    layer_log::mark_unlogged(c.inner(), oid(id))
-        .await
-        .map_err(adapt)
+    layer_log::mark_unlogged(c.inner(), id).await.map_err(adapt)
 }
 
 /// Final delete: the object leaves with every row and its log; the envelopes of its exceptions go with it.
@@ -156,7 +135,7 @@ pub async fn mark_unlogged(c: &Conn<'_>, id: ObjectId) -> Result<()> {
 /// # Errors
 /// `NotFound`, or `Invalid` when the object is not in the trash.
 pub async fn delete_final(c: &Conn<'_>, id: ObjectId) -> Result<()> {
-    layer::delete_final(c.inner(), &DOMAIN, oid(id))
+    layer::delete_final(c.inner(), &DOMAIN, id)
         .await
         .map_err(adapt)
 }

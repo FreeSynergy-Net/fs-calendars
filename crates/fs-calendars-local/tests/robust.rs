@@ -5,6 +5,7 @@
 mod common;
 
 use common::{fx, ms, utc};
+use fs_calendars_testdata::draft::Trash;
 use fs_calendars_testdata::draft::{AppointmentQuery, Appointments, Error, Span, When};
 use fs_calendars_testdata::sample::at;
 use fs_calendars_testdata::zone::{custom, iana};
@@ -28,13 +29,13 @@ async fn custom_zones_are_refused_as_unsupported_everywhere() {
         "{r:?}"
     );
     let c =
-        f.p.create_calendar("K", None, Some(custom("/Custom/Y")))
+        f.p.create_calendar("K", None, Some(custom("/Custom/Y")), None)
             .await;
     assert!(
         matches!(c, Err(Error::Unsupported { ref capability, .. }) if capability == "calendar.create"),
         "{c:?}"
     );
-    assert_eq!(f.p.calendars().await.unwrap().len(), 1);
+    assert_eq!(f.p.calendars(Trash::Exclude).await.unwrap().len(), 1);
 }
 
 #[tokio::test]
