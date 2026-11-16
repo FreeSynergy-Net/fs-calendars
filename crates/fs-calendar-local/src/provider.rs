@@ -89,6 +89,17 @@ impl LocalAppointments {
         c.finish(r).await
     }
 
+    /// The period run (ADR 0073): forget the cuts whose restore period is over and the exceptions they hid.
+    /// Not part of the trait; the program calls it from its own schedule.
+    ///
+    /// # Errors
+    /// The engine's error.
+    pub async fn sweep_expired(&self) -> Result<crate::sweep::Swept> {
+        let c = self.store.begin().await?;
+        let r = crate::sweep::sweep_expired(&c, self.clock.now()).await;
+        c.finish(r).await
+    }
+
     /// The store (the tests look at the rows).
     #[must_use]
     pub fn store(&self) -> &Store {

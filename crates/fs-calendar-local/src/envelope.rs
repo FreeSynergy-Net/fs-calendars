@@ -286,5 +286,12 @@ pub async fn delete_final(c: &Conn<'_>, id: ObjectId) -> Result<()> {
     }
     c.exec("DELETE FROM objects WHERE id = ?", vec![id_value(id)])
         .await?;
+    for t in ["purged_objects", "unlogged_ids"] {
+        c.exec(
+            &format!("DELETE FROM {t} WHERE object_id = ?"),
+            vec![id_value(id)],
+        )
+        .await?;
+    }
     Ok(())
 }

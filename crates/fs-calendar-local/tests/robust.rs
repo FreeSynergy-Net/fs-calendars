@@ -321,3 +321,64 @@ async fn a_future_cancelled_inside_finish_still_rolls_back_at_the_next_access() 
     );
     f.make_berlin("danach", 2, 9).await;
 }
+
+#[tokio::test]
+async fn the_period_run_forgets_expired_cuts_and_their_hidden_exceptions() {
+    use common::series::{days, following, this, title, weekly};
+    let f = fx().await;
+    let a = weekly(&f).await;
+    let u =
+        f.p.update(a.id, a.revision, title("Sonder"), this(23))
+            .await
+            .unwrap();
+    let d = f.p.delete(a.id, u.revision, following(16)).await.unwrap();
+    let other = weekly(&f).await;
+    assert_eq!(f.count("calendar_cut").await, 1);
+    assert_eq!(
+        f.count("calendar_appointment").await,
+        3,
+        "two masters, the exception and nothing else yet"
+    );
+    f.set_now(d.restorable_until.unwrap().millis() - 1);
+    assert_eq!(
+        f.p.sweep_expired().await.unwrap(),
+        fs_calendar_local::sweep::Swept::default(),
+        "not over yet"
+    );
+    f.set_now(d.restorable_until.unwrap().millis());
+    let swept = f.p.sweep_expired().await.unwrap();
+    assert_eq!(
+        (swept.cuts, swept.hidden),
+        (1, 1),
+        "the bound is closed: `until <= now`"
+    );
+    assert_eq!(
+        f.count("calendar_cut").await + f.count("calendar_cut_rule").await,
+        0
+    );
+    assert_eq!(
+        f.count("calendar_appointment").await,
+        2,
+        "the hidden exception is gone"
+    );
+    assert_eq!(f.count("calendar_override_field").await, 0);
+    assert!(f.p.get(other.id).await.unwrap().is_some());
+    let _ = days(&f).await;
+    assert_eq!(f.p.sweep_expired().await.unwrap().cuts, 0);
+}
+
+#[tokio::test]
+async fn the_final_delete_forgets_the_marks_of_the_object() {
+    let f = fx().await;
+    let a = f.make_berlin("a", 2, 9).await;
+    f.p.purge_log(a.id).await.unwrap();
+    f.p.mark_unlogged(a.id).await.unwrap();
+    f.p.delete(a.id, a.revision, SeriesScope::Whole)
+        .await
+        .unwrap();
+    f.p.delete_final(a.id).await.unwrap();
+    assert_eq!(
+        f.count("purged_objects").await + f.count("unlogged_ids").await,
+        0
+    );
+}

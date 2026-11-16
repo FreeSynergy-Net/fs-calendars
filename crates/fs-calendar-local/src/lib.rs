@@ -33,6 +33,7 @@ pub mod series;
 pub mod series_tables;
 pub mod spec;
 pub mod store;
+pub mod sweep;
 pub mod typed;
 pub mod words;
 pub mod write;
