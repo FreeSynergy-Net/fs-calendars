@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use fs_calendar_testdata::draft::{
     Alert, Appointment, AppointmentPatch, Attendee, FieldChange, OverrideChange, Participant,
-    RecurrenceRule, RuleEnd, Trigger, Value as Val, When,
+    Trigger, Value as Val, When,
 };
 
 use crate::words::{
@@ -16,7 +16,7 @@ use crate::words::{
 /// `(field, row key)` to value.
 pub type Flat = BTreeMap<(String, Option<String>), Val>;
 
-fn put(f: &mut Flat, field: &str, key: Option<&str>, v: Val) {
+pub(crate) fn put(f: &mut Flat, field: &str, key: Option<&str>, v: Val) {
     f.insert((field.to_owned(), key.map(str::to_owned)), v);
 }
 
@@ -73,7 +73,7 @@ pub fn flatten(a: &Appointment) -> Flat {
         rules
             .iter()
             .enumerate()
-            .for_each(|(i, r)| rule(&mut f, &format!("{ex}{i}"), r));
+            .for_each(|(i, r)| crate::fields_rule::rule(&mut f, &format!("{ex}{i}"), r));
     }
     for r in &a.related {
         put(
@@ -84,26 +84,6 @@ pub fn flatten(a: &Appointment) -> Flat {
         );
     }
     f
-}
-
-fn rule(f: &mut Flat, k: &str, r: &RecurrenceRule) {
-    let k = Some(k);
-    put(f, "rule.frequency", k, text(&format!("{:?}", r.frequency)));
-    put(f, "rule.interval", k, Val::Int(i64::from(r.interval)));
-    match r.end {
-        RuleEnd::Never => {}
-        RuleEnd::Count(n) => put(f, "rule.count", k, Val::Int(i64::from(n))),
-        RuleEnd::Until(l) => put(f, "rule.until", k, Val::Local(l)),
-    }
-    put(
-        f,
-        "rule.by",
-        k,
-        text(&format!(
-            "{:?}{:?}{:?}{:?}",
-            r.by_day, r.by_month_day, r.by_month, r.by_set_position
-        )),
-    );
 }
 
 fn when(f: &mut Flat, w: &When) {

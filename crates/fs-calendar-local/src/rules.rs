@@ -16,7 +16,7 @@ use crate::codec::{
 use crate::store::Conn;
 use crate::words::{Table as Words, from_word, word};
 
-const FREQ: [(Frequency, &str); 7] = [
+pub const FREQ: [(Frequency, &str); 7] = [
     (Frequency::Yearly, "yearly"),
     (Frequency::Monthly, "monthly"),
     (Frequency::Weekly, "weekly"),
@@ -25,7 +25,7 @@ const FREQ: [(Frequency, &str); 7] = [
     (Frequency::Minutely, "minutely"),
     (Frequency::Secondly, "secondly"),
 ];
-const SKIPS: [(Skip, &str); 3] = [
+pub const SKIPS: [(Skip, &str); 3] = [
     (Skip::Omit, "omit"),
     (Skip::Backward, "backward"),
     (Skip::Forward, "forward"),

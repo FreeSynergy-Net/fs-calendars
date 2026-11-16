@@ -17,6 +17,7 @@ pub mod codec;
 pub mod cuts;
 pub mod envelope;
 pub mod fields;
+pub mod fields_rule;
 pub mod history;
 pub mod object_tables;
 pub mod ops;
