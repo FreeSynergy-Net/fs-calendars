@@ -1,12 +1,12 @@
 [workspace]
 resolver = "2"
 # Until the port, see DESIGN.md "Admin window": the app has its own Cargo.lock and old fs-components pin.
-exclude = ["crates/fs-calendar-app"]
-members = ["crates/fs-calendar-core", "crates/fs-calendar-server", "crates/fs-calendar-tasks", "crates/fs-calendar-cli", "crates/fs-calendar", "crates/fs-calendar-testdata", "crates/fs-calendar-local"]
+exclude = ["crates/fs-calendars-app"]
+members = ["crates/fs-calendars-core", "crates/fs-calendars-server", "crates/fs-calendars-tasks", "crates/fs-calendars-cli", "crates/fs-calendars", "crates/fs-calendars-testdata", "crates/fs-calendars-local"]
 
 [workspace.package]
 authors = ["FreeSynergy <support@freesynergy.net>"]
-repository = "https://github.com/FreeSynergy/fs-calendar"
+repository = "https://github.com/FreeSynergy/fs-calendars"
 version = "0.0.4"
 edition = "2024"
 license = "MIT OR Apache-2.0"

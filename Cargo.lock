@@ -715,23 +715,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
-name = "fs-calendar"
+name = "fs-calendars"
 version = "0.0.4"
 dependencies = [
- "fs-calendar-cli",
- "fs-calendar-server",
+ "fs-calendars-cli",
+ "fs-calendars-server",
  "fs-interfaces 0.0.22",
  "tempfile",
  "tokio",
 ]
 
 [[package]]
-name = "fs-calendar-cli"
+name = "fs-calendars-cli"
 version = "0.0.4"
 dependencies = [
  "capnp",
- "fs-calendar-core",
- "fs-calendar-server",
+ "fs-calendars-core",
+ "fs-calendars-server",
  "fs-interfaces 0.0.22",
  "fs-objects 0.0.1",
  "serde_json",
@@ -740,7 +740,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar-core"
+name = "fs-calendars-core"
 version = "0.0.4"
 dependencies = [
  "async-trait",
@@ -761,12 +761,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar-local"
+name = "fs-calendars-local"
 version = "0.0.4"
 dependencies = [
  "async-trait",
  "chrono",
- "fs-calendar-testdata",
+ "fs-calendars-testdata",
  "fs-jscalendar 0.0.2",
  "fs-objects 0.0.2",
  "fs-types",
@@ -776,14 +776,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar-server"
+name = "fs-calendars-server"
 version = "0.0.4"
 dependencies = [
  "async-trait",
  "capnp",
  "capnp-rpc",
  "chrono",
- "fs-calendar-core",
+ "fs-calendars-core",
  "fs-interfaces 0.0.22",
  "fs-objects 0.0.1",
  "fs-types",
@@ -794,13 +794,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar-tasks"
+name = "fs-calendars-tasks"
 version = "0.0.4"
 dependencies = [
  "async-trait",
  "capnp",
  "chrono",
- "fs-calendar-core",
+ "fs-calendars-core",
  "fs-interfaces 0.0.22",
  "fs-objects 0.0.1",
  "fs-tasks-core",
@@ -811,7 +811,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar-testdata"
+name = "fs-calendars-testdata"
 version = "0.0.4"
 dependencies = [
  "async-trait",
