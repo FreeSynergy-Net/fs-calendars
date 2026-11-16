@@ -1528,7 +1528,7 @@ dependencies = [
  "fs-components-styles",
  "fs-components-widgets",
  "fs-interfaces 0.0.22",
- "fs-objects 0.0.1 (git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1)",
+ "fs-objects 0.0.1",
  "fs-tasks-core",
  "fs-types 0.0.1",
  "fs-types 0.0.22",
@@ -1545,7 +1545,7 @@ dependencies = [
  "fs-calendar-core",
  "fs-calendar-server",
  "fs-interfaces 0.0.22",
- "fs-objects 0.0.1 (git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1)",
+ "fs-objects 0.0.1",
  "serde_json",
  "tempfile",
  "tokio",
@@ -1561,7 +1561,7 @@ dependencies = [
  "chrono",
  "fs-interfaces 0.0.22",
  "fs-jscalendar 0.0.2",
- "fs-objects 0.0.1 (git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1)",
+ "fs-objects 0.0.1",
  "fs-types 0.0.22",
  "proptest",
  "rrule",
@@ -1580,7 +1580,7 @@ dependencies = [
  "chrono",
  "fs-calendar-testdata",
  "fs-jscalendar 0.0.2",
- "fs-objects 0.0.1",
+ "fs-objects 0.0.2",
  "fs-types 0.0.22",
  "serde_json",
  "tokio",
@@ -1597,7 +1597,7 @@ dependencies = [
  "chrono",
  "fs-calendar-core",
  "fs-interfaces 0.0.22",
- "fs-objects 0.0.1 (git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1)",
+ "fs-objects 0.0.1",
  "fs-types 0.0.22",
  "serde_json",
  "tempfile",
@@ -1614,7 +1614,7 @@ dependencies = [
  "chrono",
  "fs-calendar-core",
  "fs-interfaces 0.0.22",
- "fs-objects 0.0.1 (git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1)",
+ "fs-objects 0.0.1",
  "fs-tasks-core",
  "fs-tasks-server",
  "serde_json",
@@ -1727,7 +1727,7 @@ dependencies = [
  "capnp",
  "capnp-rpc",
  "chrono",
- "fs-objects 0.0.1 (git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1)",
+ "fs-objects 0.0.1",
  "futures",
  "idna",
  "rustix 1.1.6",
@@ -1753,7 +1753,7 @@ dependencies = [
  "capnp",
  "capnp-rpc",
  "chrono",
- "fs-objects 0.0.1 (git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1)",
+ "fs-objects 0.0.1",
  "futures",
  "idna",
  "rustix 1.1.6",
@@ -1797,12 +1797,11 @@ dependencies = [
 [[package]]
 name = "fs-objects"
 version = "0.0.1"
+source = "git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1#7cf0f05e3a9835b582aa2ac22014f2a1f1bff200"
 dependencies = [
  "async-trait",
  "base64",
  "chrono",
- "fs-types 0.0.22",
- "getrandom 0.3.4",
  "serde",
  "serde_json",
  "sha2",
@@ -1815,12 +1814,14 @@ dependencies = [
 
 [[package]]
 name = "fs-objects"
-version = "0.0.1"
-source = "git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1#7cf0f05e3a9835b582aa2ac22014f2a1f1bff200"
+version = "0.0.2"
+source = "git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.2#cad3c46f436489712aa90c3268b3008ce43e8a2e"
 dependencies = [
  "async-trait",
  "base64",
  "chrono",
+ "fs-types 0.0.22",
+ "getrandom 0.3.4",
  "serde",
  "serde_json",
  "sha2",
@@ -1841,7 +1842,7 @@ dependencies = [
  "chrono",
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.1)",
  "fs-jscalendar 0.0.1",
- "fs-objects 0.0.1 (git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1)",
+ "fs-objects 0.0.1",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -1856,7 +1857,7 @@ dependencies = [
  "capnp",
  "capnp-rpc",
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.1)",
- "fs-objects 0.0.1 (git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.1)",
+ "fs-objects 0.0.1",
  "fs-tasks-core",
  "serde_json",
 ]
