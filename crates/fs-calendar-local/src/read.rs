@@ -11,9 +11,9 @@ use crate::codec::{
     int_to_local, zone_of,
 };
 pub use crate::read_children::{fill, fill_series};
-use crate::spec::Table;
 use crate::store::Conn;
 use crate::words::{FREE_BUSY, PRIVACY, STATUS, TEXT_TYPE, from_word};
+use fs_objects::v5::spec::Table;
 
 /// A row with column access by name.
 pub struct Rd<'a> {

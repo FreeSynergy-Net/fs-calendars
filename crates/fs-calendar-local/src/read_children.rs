@@ -10,9 +10,9 @@ use turso::Value;
 use crate::calendar_tables::{ALERT, PARTICIPANT};
 use crate::codec::{Row, damaged, get_text, id_value, person_of, reference_of};
 use crate::read::Rd;
-use crate::spec::Table;
 use crate::store::Conn;
 use crate::words::{ALERT_ACTION, PARTICIPATION, RELATIVE_TO, from_word};
+use fs_objects::v5::spec::Table;
 
 async fn child_rows(c: &Conn<'_>, t: &Table, id: &Value) -> Result<Vec<Row>> {
     let cols: Vec<&str> = t.cols.iter().map(|c| c.name).collect();

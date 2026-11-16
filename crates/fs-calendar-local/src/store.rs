@@ -1,96 +1,48 @@
-//! The v5 store: one connection with `PRAGMA foreign_keys = ON`, one transaction per write (R3, R4).
+//! The calendar's view of the v5 store: the shared layer (`fs_objects::v5`) with the trait's error and types.
 //!
-//! Pattern: Adapter (the turso engine behind typed helpers); `Conn` is a guard that owns the connection for one
-//! unit of work. `finish` commits or rolls back; a guard dropped without `finish` leaves the transaction open, so
-//! every write path ends in `finish`.
+//! Pattern: Adapter (the layer speaks `fs-types`; the locked trait speaks its stand-ins, so every call maps the error
+//! and, where an id or a person crosses, the type). When the trait moves to `fs-types` this file collapses to a
+//! `pub use`. `Conn` is the guard of the layer (drop guard, `finish`); `Borrowed` is the connection a period-run hook
+//! gets from the layer.
 
-use fs_calendar_testdata::draft::{Error, Result};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use fs_calendar_testdata::draft::Result;
+use fs_objects::v5;
+use turso::Value;
 
-use tokio::sync::{Mutex, MutexGuard};
-use turso::{Builder, Connection, Value};
+use crate::bridge::adapt;
+use crate::codec::Row;
+use crate::registry::DOMAIN;
+use crate::typed::check_zones;
+use fs_objects::v5::spec::Table;
 
-use crate::codec::{Row, invalid};
-use crate::spec::Table;
-use crate::typed::check_row;
-
-/// The store.
-pub struct Store {
-    _db: turso::Database,
-    conn: Mutex<Connection>,
-    /// Set when a unit of work was dropped without `finish` (a cancelled future): the next access rolls back first.
-    dirty: Arc<AtomicBool>,
-}
+/// The store (one file, one program: the calendar's).
+pub struct Store(v5::Store);
 
 /// The connection for one unit of work.
-pub struct Conn<'a> {
-    guard: MutexGuard<'a, Connection>,
-    in_tx: bool,
-    dirty: Arc<AtomicBool>,
-}
-
-impl Drop for Conn<'_> {
-    fn drop(&mut self) {
-        if self.in_tx {
-            self.dirty.store(true, Ordering::SeqCst);
-        }
-    }
-}
-
-/// An engine error as the trait's error: a refused constraint is `Invalid`, anything else `Unavailable`.
-#[must_use]
-pub fn engine(e: &turso::Error) -> Error {
-    let msg = e.to_string();
-    let low = msg.to_lowercase();
-    if [
-        "constraint failed",
-        "constraint violation",
-        "foreign key",
-        "cannot store",
-        "datatype mismatch",
-    ]
-    .iter()
-    .any(|w| low.contains(w))
-    {
-        invalid("store", &msg)
-    } else {
-        Error::Unavailable(msg)
-    }
+pub enum Conn<'a> {
+    /// The guard of a unit of work the calendar opened (`begin`, `read`).
+    Own(v5::Conn<'a>),
+    /// The connection of the layer's period run, lent to a hook.
+    Borrowed(&'a v5::Conn<'a>),
 }
 
 impl Store {
-    /// Open (creating if needed) the store at `path`; `:memory:` is volatile. Registers the store's own tables.
+    /// Open (creating if needed) the store at `path` (`:memory:` is volatile), register the `calendar_` domain.
+    ///
+    /// # Errors
+    /// `Unavailable` when the engine cannot open the file or a step fails; `Invalid` on a clash in the registry.
+    pub async fn open(path: &str, now: i64) -> Result<Self> {
+        let s = Self::open_bare(path, now).await?;
+        s.register_domain(&DOMAIN, now).await?;
+        Ok(s)
+    }
+
+    /// Open the store with the layer's own tables only (no program domain yet).
     ///
     /// # Errors
     /// `Unavailable` when the engine cannot open the file.
-    pub async fn open(path: &str, now: i64) -> Result<Self> {
-        let db = Builder::new_local(path)
-            .build()
-            .await
-            .map_err(|e| engine(&e))?;
-        let conn = db.connect().map_err(|e| engine(&e))?;
-        conn.execute("PRAGMA foreign_keys = ON", ())
-            .await
-            .map_err(|e| engine(&e))?;
-        let store = Self {
-            _db: db,
-            conn: Mutex::new(conn),
-            dirty: Arc::new(AtomicBool::new(false)),
-        };
-        let c = store.begin().await?;
-        let r = crate::registry::bootstrap(&c, now).await;
-        c.finish(r).await?;
-        Ok(store)
-    }
-
-    /// The connection; a transaction that a cancelled future left open is rolled back first (K1).
-    async fn lock(&self) -> MutexGuard<'_, Connection> {
-        let guard = self.conn.lock().await;
-        if self.dirty.swap(false, Ordering::SeqCst) {
-            let _ = guard.execute("ROLLBACK", ()).await;
-        }
-        guard
+    pub async fn open_bare(path: &str, now: i64) -> Result<Self> {
+        v5::Store::open(path, now).await.map(Self).map_err(adapt)
     }
 
     /// Lock the connection and open a transaction (`BEGIN IMMEDIATE`).
@@ -98,65 +50,39 @@ impl Store {
     /// # Errors
     /// `Unavailable` when the engine refuses.
     pub async fn begin(&self) -> Result<Conn<'_>> {
-        let guard = self.lock().await;
-        guard
-            .execute("BEGIN IMMEDIATE", ())
-            .await
-            .map_err(|e| engine(&e))?;
-        Ok(Conn {
-            guard,
-            in_tx: true,
-            dirty: self.dirty.clone(),
-        })
+        self.0.begin().await.map(Conn::Own).map_err(adapt)
     }
 
     /// Lock the connection for reading (no transaction).
     pub async fn read(&self) -> Conn<'_> {
-        Conn {
-            guard: self.lock().await,
-            in_tx: false,
-            dirty: self.dirty.clone(),
-        }
+        Conn::Own(self.0.read().await)
     }
 
-    /// Register a domain (R1): its tables are created and written down.
+    /// Register a program domain (the layer applies the steps that are missing).
     ///
     /// # Errors
-    /// `Invalid` for a reserved prefix or a clash.
-    pub async fn register_domain(
-        &self,
-        prefix: &str,
-        version: i64,
-        about: &str,
-        tables: &[Table],
-        now: i64,
-    ) -> Result<()> {
-        let c = self.begin().await?;
-        let r = crate::registry::register(&c, prefix, version, about, tables, now).await;
-        c.finish(r).await
+    /// `Invalid` for a reserved prefix or a clash, `Unavailable` for a second program in this file or a failed step.
+    pub async fn register_domain(&self, d: &v5::Domain, now: i64) -> Result<()> {
+        self.0.register_domain(d, now).await.map_err(adapt)
     }
 }
 
-impl Conn<'_> {
+impl<'a> Conn<'a> {
+    /// The layer's connection (for the layer's own functions).
+    #[must_use]
+    pub fn inner(&self) -> &v5::Conn<'a> {
+        match self {
+            Self::Own(c) => c,
+            Self::Borrowed(c) => c,
+        }
+    }
+
     /// Rows of a query.
     ///
     /// # Errors
     /// The engine's error.
     pub async fn query(&self, sql: &str, params: Vec<Value>) -> Result<Vec<Row>> {
-        let mut rows = self
-            .guard
-            .query(sql, turso::params_from_iter(params))
-            .await
-            .map_err(|e| engine(&e))?;
-        let mut out = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| engine(&e))? {
-            let mut r = Vec::with_capacity(row.column_count());
-            for i in 0..row.column_count() {
-                r.push(row.get_value(i).map_err(|e| engine(&e))?);
-            }
-            out.push(r);
-        }
-        Ok(out)
+        self.inner().query(sql, params).await.map_err(adapt)
     }
 
     /// Execute a statement; the number of rows it changed.
@@ -164,10 +90,7 @@ impl Conn<'_> {
     /// # Errors
     /// The engine's error.
     pub async fn exec(&self, sql: &str, params: Vec<Value>) -> Result<u64> {
-        self.guard
-            .execute(sql, turso::params_from_iter(params))
-            .await
-            .map_err(|e| engine(&e))
+        self.inner().exec(sql, params).await.map_err(adapt)
     }
 
     /// Execute a statement without parameters.
@@ -175,99 +98,41 @@ impl Conn<'_> {
     /// # Errors
     /// The engine's error.
     pub async fn run(&self, sql: &str) -> Result<()> {
-        self.exec(sql, Vec::new()).await.map(|_| ())
+        self.inner().run(sql).await.map_err(adapt)
     }
 
-    /// Insert one row after the checks of R2 (`values` in column order).
+    /// Insert one row after the checks of the layer and of the zone names (`values` in column order).
     ///
     /// # Errors
-    /// `Invalid` naming `table.column`.
+    /// `Invalid` naming `table.column`, `UnknownZone` for a zone that does not exist.
     pub async fn insert(&self, t: &Table, values: Vec<Value>) -> Result<()> {
-        check_row(t, &values)?;
-        let names: Vec<&str> = t.cols.iter().map(|c| c.name).collect();
-        let marks = vec!["?"; names.len()].join(",");
-        self.exec(
-            &format!(
-                "INSERT INTO {} ({}) VALUES ({marks})",
-                t.name,
-                names.join(",")
-            ),
-            values,
-        )
-        .await
-        .map(|_| ())
+        check_zones(t, &values)?;
+        self.inner().insert(t, values).await.map_err(adapt)
     }
 
-    /// Insert or update on the primary key `key` (never `REPLACE`: that would cascade, draft R4).
+    /// Insert or update on the primary key `key` (never `REPLACE`).
     ///
     /// # Errors
-    /// `Invalid` naming `table.column`.
+    /// As [`Conn::insert`].
     pub async fn upsert(&self, t: &Table, key: &[&str], values: Vec<Value>) -> Result<()> {
-        check_row(t, &values)?;
-        let names: Vec<&str> = t.cols.iter().map(|c| c.name).collect();
-        let marks = vec!["?"; names.len()].join(",");
-        let set: Vec<String> = names
-            .iter()
-            .filter(|n| !key.contains(n))
-            .map(|n| format!("{n} = excluded.{n}"))
-            .collect();
-        let sql = format!(
-            "INSERT INTO {} ({}) VALUES ({marks}) ON CONFLICT ({}) DO UPDATE SET {}",
-            t.name,
-            names.join(","),
-            key.join(","),
-            set.join(", ")
-        );
-        self.exec(&sql, values).await.map(|_| ())
+        check_zones(t, &values)?;
+        self.inner().upsert(t, key, values).await.map_err(adapt)
     }
 
-    /// End the unit of work: commit on `Ok`, roll back on `Err` (nothing is written anywhere).
-    ///
-    /// `finish` suspends once before the COMMIT (one scheduler turn per unit of work). That is a deliberate hook in the
-    /// production path: it makes the cancel point real, so that `tests/transaction.rs` can drop the future exactly
-    /// there and prove that the next access rolls back (K1).
+    /// End the unit of work: commit on `Ok`, roll back on `Err`. The calendar's own error survives the rollback.
     ///
     /// # Errors
     /// The error of `r`, or of the commit.
-    pub async fn finish<T>(mut self, r: Result<T>) -> Result<T> {
-        if !self.in_tx {
-            return r;
-        }
-        // `in_tx` stays true until the engine has answered: a future cancelled before that point is dropped with
-        // `in_tx` set, so `Drop` marks the connection and the next access rolls back (K1).
-        Suspend(false).await;
-        let out = match r {
-            Ok(v) => match self.guard.execute("COMMIT", ()).await {
-                Ok(_) => Ok(v),
-                Err(e) => {
-                    let _ = self.guard.execute("ROLLBACK", ()).await;
-                    Err(engine(&e))
-                }
-            },
+    pub async fn finish<T>(self, r: Result<T>) -> Result<T> {
+        let Self::Own(c) = self else { return r };
+        match r {
+            Ok(v) => c.finish(Ok(v)).await.map_err(adapt),
             Err(e) => {
-                let _ = self.guard.execute("ROLLBACK", ()).await;
+                let _ = c
+                    .finish::<()>(Err(v5::Error::Unavailable(format!("{e:?}"))))
+                    .await;
                 Err(e)
             }
-        };
-        self.in_tx = false;
-        out
-    }
-}
-
-/// Gives the scheduler one turn (a real suspension point, so that a cancel there can be tested).
-struct Suspend(bool);
-
-impl std::future::Future for Suspend {
-    type Output = ();
-    fn poll(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<()> {
-        if self.0 {
-            return std::task::Poll::Ready(());
         }
-        self.0 = true;
-        cx.waker().wake_by_ref();
-        std::task::Poll::Pending
     }
 }

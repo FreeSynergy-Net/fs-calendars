@@ -15,10 +15,10 @@ use crate::codec::{
     get_int, get_opt_int, get_opt_text, get_text, id_value, int, int_to_local, local_to_int,
     opt_int, opt_text, reference_of, text,
 };
-use crate::object_tables::{OBJECT_ORIGIN, OBJECT_ORIGINAL};
 use crate::series_tables::UNREAD;
 use crate::store::Conn;
 use crate::words::{from_word, word};
+use fs_objects::v5::tables_more::{OBJECT_ORIGIN, OBJECT_ORIGINAL};
 
 const CHANNELS: [(OriginChannel, &str); 7] = [
     (OriginChannel::File, "file"),

@@ -10,12 +10,15 @@ publish = false
 [dependencies]
 # The locked trait (folder hash 2b7fc98b..., byte-equal copy under `draft/appointments_v1`) and the zone helpers of the pilot.
 fs-calendar-testdata = { path = "../fs-calendar-testdata" }
-# The same engine and exact pin as fs-objects (v5 lives next to v4 until the migration).
+# The raised v5 layer (store, ids, envelope, log, original, purge). PROVISIONAL path dependency on the worktree of
+# unreviewed/v5-speicher (head f7b4cca): BLOCKER for main, switch to a git pin (tag) once fs-objects is merged and tagged.
+fs-objects = { path = "/srv/FreeSynergy/.scratch/api-runner/wt/v5-hebe/crates/fs-objects", features = ["v5"] }
+# The shared types the layer speaks (same tag as fs-calendar-core).
+fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.22" }
+# The same engine and exact pin as fs-objects (rows are `turso::Value`).
 turso = { version = "=0.8.3", default-features = false }
 tokio = { version = "1", features = ["sync", "time"] }
 async-trait = "0.1"
-# OS randomness for UUIDv7 ids (already in the lock through the engine).
-getrandom = "0.3"
 # The iCalendar/JSCalendar conversion the pilot already uses (calcard pinned there); same tag as fs-calendar-core.
 fs-jscalendar = { git = "https://github.com/FreeSynergy/fs-jscalendar", tag = "v0.0.2" }
 serde_json = "1"

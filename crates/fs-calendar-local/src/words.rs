@@ -3,8 +3,7 @@
 //! Pattern: Value Object (const lookup tables); two generic functions read them in both directions.
 
 use fs_calendar_testdata::draft::{
-    AlertAction, FreeBusy, HistoryKind, ParticipationStatus, Privacy, RelativeTo, Result, Status,
-    TextType,
+    AlertAction, FreeBusy, ParticipationStatus, Privacy, RelativeTo, Result, Status, TextType,
 };
 
 use crate::codec::damaged;
@@ -49,14 +48,4 @@ pub const RELATIVE_TO: [(RelativeTo, &str); 2] =
 pub const ALERT_ACTION: [(AlertAction, &str); 2] = [
     (AlertAction::Display, "display"),
     (AlertAction::Email, "email"),
-];
-pub const HISTORY_KIND: [(HistoryKind, &str); 8] = [
-    (HistoryKind::Create, "Create"),
-    (HistoryKind::Update, "Update"),
-    (HistoryKind::Delete, "Delete"),
-    (HistoryKind::Undo, "Undo"),
-    (HistoryKind::Invite, "Invite"),
-    (HistoryKind::Accept, "Accept"),
-    (HistoryKind::TentativeAccept, "TentativeAccept"),
-    (HistoryKind::Reject, "Reject"),
 ];

@@ -2,7 +2,7 @@
 //!
 //! Pattern: Value Object (const table specifications).
 
-use crate::spec::{
+use fs_objects::v5::spec::{
     Col,
     Logical::{Bool, Enum, Int, Local, Ref, Text, Utc},
     Table,

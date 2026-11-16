@@ -3,15 +3,14 @@
 //! Pattern: Value Object (const table specifications). Not stored yet: channels, delegations, `reply_to`, locations,
 //! virtual locations, links, localizations, custom zones, alert fire times.
 
-use crate::object_tables::{ART, WHO_KINDS};
-use crate::spec::{
+use fs_objects::v5::spec::{
     Col,
     Logical::{Bool, Date, Enum, Int, Iri, Local, Ref, Text, Utc, Zone},
     Table,
 };
+use fs_objects::v5::tables::{ART, WHO_KINDS};
 
 pub const PREFIX: &str = "calendar";
-pub const VERSION: i64 = 4;
 pub const STATUS: &[&str] = &["confirmed", "tentative", "cancelled"];
 pub const FREE_BUSY: &[&str] = &["busy", "free"];
 pub const PRIVACY: &[&str] = &["public", "private", "secret"];

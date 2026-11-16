@@ -10,7 +10,6 @@ use fs_calendar_testdata::draft::{
     PersonRef, Place, Result, Revision, SeriesScope, Utc, Window, Zone,
 };
 
-use crate::calendar_tables::{ALL, PREFIX, VERSION};
 use crate::clock::Clock;
 use crate::codec::{id_value, text};
 use crate::read::load;
@@ -43,15 +42,6 @@ impl LocalAppointments {
     pub async fn open(path: &str, actor: PersonRef, clock: Clock) -> Result<Self> {
         let now = clock.now();
         let store = Store::open(path, now).await?;
-        store
-            .register_domain(
-                PREFIX,
-                VERSION,
-                "calendar: collections, appointments, participants, alerts",
-                &ALL,
-                now,
-            )
-            .await?;
         Ok(Self {
             store,
             actor,

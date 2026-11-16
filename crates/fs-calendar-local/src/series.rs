@@ -17,7 +17,7 @@ use crate::clock::new_id;
 use crate::codec::{
     get_id, get_int, get_text, id_value, int, int_to_local, invalid, local_to_int, text,
 };
-use crate::envelope::insert;
+use crate::envelope::{insert, touch};
 use crate::read::{Rd, fill, head, select};
 use crate::store::Conn;
 use crate::write::write_row;
@@ -133,12 +133,9 @@ async fn write_exception(
     if existing.is_none() {
         insert(c, eid, "EventException", &m.title, actor, now).await?;
     } else {
-        // The envelope follows the row (an old title must not stay in `objects.name`); same id, no `DELETE`.
-        c.exec(
-            "UPDATE objects SET name = ?, name_sort = ? WHERE id = ?",
-            vec![text(&m.title), text(&m.title.to_lowercase()), id_value(eid)],
-        )
-        .await?;
+        // The envelope follows the row (an old title must not stay in `objects.name`, `name_sort` or the revision): the
+        // layer's `touch` moves them together; same id, no `DELETE`.
+        touch(c, eid, Some(&m.title), now).await?;
     }
     write_row(
         c,
