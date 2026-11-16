@@ -3,16 +3,17 @@
 //! Ordner (ADR 0043, jede Datei <= 300 Zeilen), ARBEITS-FIXPUNKT per `tools/hash-ordner.sh appointments_v1` (SHA-256
 //! über sortierte relative Pfade und Inhalte, `LC_ALL=C`). Vorgänger-Fixpunkt `2b7fc98b…19b8` (Stand-in-Typen). Dieser
 //! Stand = Typ-Tausch (Entscheidung 21, 2026-11-16: vor dem ersten Release IN v1 geändert, kein Sprung auf v2) plus
-//! Kalender verwalten, Papierkorb-Frist und Abo-Kalender. Feature-Freeze: offen (Nutzer).
+//! Kalender verwalten, Papierkorb-Frist, Abo- und Konto-Kalender, Nutzerantworten 22-25 (Runde 2 nach Opus-Review).
+//! Feature-Freeze: offen (Nutzer).
 //! Dateien: `mod.rs` (dieser Kopf), `shared.rs` (`pub use` aus fs-types), `errors.rs` (Fehler des Themas), `time.rs`
 //! (`Span`, `When`; `Origin` aus fs-jscalendar), `parts.rs` (Unterobjekte; Regel und Erinnerung aus fs-jscalendar),
 //! `calendar.rs` (Kalender, Abo, Papierkorb-Frist), `appointment.rs`, `query.rs`, `api.rs` (Trait `Appointments`),
 //! `exchange.rs` (Grenze `Exchange`, verbrauchtes `PersonDirectory`).
 //!
 //! GEMEINSAME TYPEN (Pins: fs-types = fs-interfaces Tag v0.0.22, fs-jscalendar Tag v0.0.2, der fs-types v0.0.22
-//! verwendet; EINE fs-types-Quelle im Lock, sonst sind die Typen verschieden): `Utc`, `LocalDateTime`, `Date`, `Zone`,
-//! `Reference`, `PersonRef`, `Attendee`, `ObjectId`, `Revision`, `MediaType`, `FileRef`, `Page`, `Capabilities`,
-//! `Problem` aus fs-types (`Place` = `PageCursor`); `RecurrenceRule` samt Teilen, `Alert` samt Teilen, `Origin` aus
+//! verwendet; immer per `tag`, nie per `rev` desselben Commits: sonst stehen ZWEI fs-types im Lock und die Typen sind
+//! verschieden): `Utc`, `LocalDateTime`, `Date`, `Zone`, `Reference`, `PersonRef`, `Attendee`, `ContactAddress`, `ObjectId`, `Revision`, `MediaType`, `FileRef`, `Page`, `Capabilities`,
+//! `Problem` aus fs-types (`Place` = `PageCursor`); `Recurrence`/`RecurrenceRule` samt Teilen, `Alert` samt Teilen, `Origin` aus
 //! fs-jscalendar. Ein anderer Name, Konstruktor oder Zugriff dort ist ein Sprung dieses Traits (ADR 0045).
 //!
 //! Pattern: Repository (Trait) + Port (ADR 0043/0045). Jede Methode ist Pflicht, keine Standardmethode (Lehre aus
@@ -25,6 +26,10 @@
 //! Regeln des Vertrags: Wer handelt, ist die fragende Person des Anbieters, nie ein Parameter (außer `respond.who`,
 //! geprüft); die Uhr ebenso (Papierkorb-Frist, Abruf). Jedes Schreiben auf Bestehendes ist Vergleich-und-Setzen gegen
 //! `expected: Revision`; ausgenommen Anlegen, `restore`, `restore_calendar`, `refresh_calendar`, `purge`.
+//! KI (ADR 0056, Nutzerantwort 29 "KI-Helfer nur auf Einladung"): ein KI-Konto ist nie Eigentümer eines Kalenders
+//! (`Invalid` am Feld `owner`) und darf nie `purge`, `delete_calendar`, `subscribe_calendar` (`Forbidden`); es handelt
+//! nur als eingeladener Helfer einer Person (Teilnehmer bzw. Recht aus fs-access, jederzeit entziehbar). Was es nicht
+//! sehen darf (fremde oder sensible Kalender), antwortet wie eine unbekannte Id (`NotFound`), nicht `Forbidden`.
 //! Papierkorb (ADR 0073 Nachtrag 2026-11-16): Löschen = Papierkorb mit Frist ([`Restorable`]); die Frist ist eine
 //! Pflicht-Einstellung des Programms (Standard 30 Tage, mindestens 1 Tag, "nie automatisch" erlaubt), keine
 //! Trait-Sache; eine Aufbewahrung (`keep_until`) geht vor; nach Ablauf geht das Objekt samt Verlauf (Kaskade).
@@ -39,19 +44,20 @@
 //! Menschen (ADR 0085): nur `PersonRef` bzw. `Attendee`, nie ein freier Name. Speicher (ADR 0086): jedes Feld hat
 //! eine typisierte Spalte (PLAN.md Abschnitt 2).
 //!
-//! ERWEITERUNGSPUNKT Terminfindung ("Doodle"): KEIN Feature dieses Traits. Vorbereitet ist nur, was eine spätere
-//! Abstimmung verbraucht: `free_busy` (auch für Räume/Ressourcen), `create` + `invite` für den gewählten Termin,
-//! `respond(.., proposal)` für Gegenvorschläge. Die Abstimmung selbst (Vorschläge, Stimmen, Gäste) wird ein eigener
-//! Trait desselben Eigentümers mit eigenem Fixpunkt; dieser Trait ändert sich dafür nicht.
+//! ERWEITERUNGSPUNKT Terminfindung ("Doodle", pilot-terminfindung/PLAN.md): KEIN Feature dieses Traits. Die
+//! Abstimmung ist eine SUITE; Umfrage, Vorschläge und Stimmen gehören fs-forms, Gäste ohne Konto kommen über
+//! fs-admission und `PersonDirectory::propose` als `PersonRef` (`Profile`). Dieser Trait liefert nur: `free_busy`
+//! (`Availability`: belegt / nicht freigegeben / unbekannt; nur in den vorgeschlagenen Fenstern, nur mit Zustimmung),
+//! `create` (Vormerkung `Status::Tentative`) + `invite` im Kalender des Besitzers (Person oder Gruppe), `respond`
+//! (auch `proposal`). Umfrage und Termin verweisen über `links` (IRI) aufeinander, kein eigenes Feld.
 //!
-//! OFFEN / ABHÄNGIG VON NUTZERFRAGEN (nicht festgeschrieben; Optionen mit Empfehlung, `appointments_v1-delta.md`):
-//! - Frage 22 (Gruppe als Eigentümerin): `CalendarInfo.owner` ist `PersonRef` und kann eine Gruppe ausdrücken; ob
-//!   `create_calendar` einen Eigentümer annimmt, ist offen. Empfehlung: ja, Parameter `owner` (Person oder Gruppe),
-//!   Rechte über fs-access; bis zur Antwort ist Eigentümer immer die fragende Person.
-//! - Frage 24 (Erinnerung per Mail/Nachricht): kein Trait-Thema; `Alert` speichert nur, das Programm löst aus.
-//! - Frage 25 (Abo per Link; Abstimmung ohne Konto): Form `CalendarSource::Subscribed` steht drin, Fähigkeiten
-//!   `calendar.subscribe`/`calendar.refresh` melden `false`, bis der Nutzer zustimmt; Gäste ohne Konto betreffen
-//!   nur den späteren Abstimmungs-Trait.
+//! NUTZERANTWORTEN (2026-11-16, Empfehlungen des Opus-Reviews, von der Strategie bestätigt):
+//! - 22 Gruppe als Eigentümerin: `owner: PersonRef` (Person/Group/Organization) in `create_calendar` und
+//!   `CalendarPatch`; Rechte nur über fs-access (Rechte-Teil-Trait), hier kein eigenes Rechtemodell.
+//! - 23 `CalDAV`: `CalendarSource::Account { collection, state }`; Abgleich ist Anbieter-Technik.
+//! - 24 Erinnerung Gerät + Mail/Nachricht: PROGRAMM (Einstellung der Person, nicht des geteilten Termins); `Alert`
+//!   bleibt wie in RFC 8984.
+//! - 25 Abo per Link: aktiv (`CalendarSource::Subscribed`, Regeln an [`Subscription`]); Terminfindung siehe oben.
 
 // Die Formen folgen JSCalendar Feld für Feld (Wahrheitswerte von `Roles` und `Appointment`, `OverrideChange::Changed` =
 // `PatchObject`); ein Umbau nur für die Lints wäre ein Formwechsel gegen RFC 8984 und gegen den Fake.

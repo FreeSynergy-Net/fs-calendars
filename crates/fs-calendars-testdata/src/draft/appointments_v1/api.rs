@@ -4,10 +4,10 @@
 //! sagt er vorher in `capabilities` und beim Aufruf ausdrücklich mit [`not_possible`] (`Unsupported`).
 
 use super::{
-    Answer, Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, AppointmentSummary, Attendee, Busy,
-    CalendarDeleted, CalendarInfo, CalendarPatch, Capabilities, Change, Deleted, Error, HistoryEntry, Invitee,
-    ObjectId, Page, PersonRef, Place, Reference, Refresh, Refreshed, Result, Revision, SeriesScope, Utc, When, Window,
-    Zone,
+    Answer, Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, AppointmentSummary, Attendee,
+    Availability, CalendarDeleted, CalendarInfo, CalendarPatch, Capabilities, Change, Deleted, Error, HistoryEntry, Invitee,
+    ObjectId, Page, PersonRef, Place, Reference, Refresh, Refreshed, Result, Revision, SeriesScope, Trash, Utc, When,
+    Window, Zone,
 };
 use async_trait::async_trait;
 
@@ -35,25 +35,30 @@ pub trait Appointments: Send + Sync {
     /// Was dieser Anbieter kann, je Kennung aus [`CAPABILITIES`].
     fn capabilities(&self) -> Capabilities;
 
-    /// `calendar.read`: alle Kalender, die die fragende Person sehen darf; `include_deleted` zeigt auch die im
-    /// Papierkorb (`CalendarInfo.trash`).
-    async fn calendars(&self, include_deleted: bool) -> Result<Vec<CalendarInfo>>;
-    /// `calendar.create`: eigener Kalender (`CalendarSource::Own`), Eigentümer = fragende Person.
-    async fn create_calendar(&self, name: &str, color: Option<&str>, default_zone: Option<Zone>) -> Result<CalendarInfo>;
-    /// `calendar.update`: Name, Farbe, Vorgabe-Zone, bei einem Abo Adresse und Abrufregel; Vergleich-und-Setzen.
+    /// `calendar.read`: alle Kalender, die die fragende Person sehen darf; `trash` wählt lebende, gelöschte oder beide
+    /// (`CalendarInfo.trash`; `Only` = Papierkorb-Ansicht).
+    async fn calendars(&self, trash: Trash) -> Result<Vec<CalendarInfo>>;
+    /// `calendar.create`: eigener Kalender (`CalendarSource::Own`). `owner = None`: die fragende Person; sonst eine
+    /// Person, Gruppe oder Organisation, für die sie das Recht hat (fs-access, sonst `Forbidden`); KI/`Profile`: `Invalid`.
+    async fn create_calendar(&self, name: &str, color: Option<&str>, default_zone: Option<Zone>, owner: Option<PersonRef>) -> Result<CalendarInfo>;
+    /// `calendar.update`: Name, Farbe, Vorgabe-Zone, Eigentümer, bei einem Abo Adresse und Abrufregel; Vergleich-und-Setzen.
     async fn update_calendar(&self, id: ObjectId, expected: Revision, change: CalendarPatch) -> Result<CalendarInfo>;
-    /// `calendar.delete`: Kalender samt seinen Terminen in den Papierkorb (eine Frist für alle, Verlauf geht mit).
+    /// `calendar.delete`: Kalender samt seinen Terminen in den Papierkorb (eine Frist für alle, Verlauf geht mit). Auch
+    /// der letzte eigene Kalender (das Programm legt sofort einen neuen an).
     async fn delete_calendar(&self, id: ObjectId, expected: Revision) -> Result<CalendarDeleted>;
     /// `calendar.restore`: Kalender samt den Terminen zurück, die mit ihm gelöscht wurden (einzeln vorher gelöschte
-    /// bleiben im Papierkorb mit ihrer eigenen Frist). `Changed`, wenn er seit dem Löschen geändert wurde.
+    /// bleiben im Papierkorb mit ihrer eigenen Frist). Kein `expected` (im Papierkorb ändert niemand); nach Ablauf der
+    /// Frist bzw. nach `purge`: `NotFound`.
     async fn restore_calendar(&self, id: ObjectId) -> Result<CalendarInfo>;
-    /// `calendar.subscribe`: Abo-Kalender (`CalendarSource::Subscribed`) anlegen; ruft NICHT ab (`FetchState::Never`).
+    /// `calendar.subscribe`: Abo-Kalender (`CalendarSource::Subscribed`) anlegen; Adresse geprüft wie bei
+    /// [`super::Subscription`] (sonst `Invalid` am Feld `url`); ruft NICHT ab (`FetchState::Never`).
     async fn subscribe_calendar(&self, name: &str, color: Option<&str>, url: &Reference, refresh: Refresh) -> Result<CalendarInfo>;
-    /// `calendar.refresh`: Abo jetzt abrufen (Klick). Ein gescheiterter Abruf ist kein `Err`, sondern
-    /// `FetchState::Failed` im Ergebnis; `Err` nur, wenn es kein Abo ist (`Invalid`) oder der Speicher fehlt.
+    /// `calendar.refresh`: Abo bzw. Konto-Sammlung jetzt abrufen/abgleichen (Klick). Ein gescheiterter Abruf ist kein
+    /// `Err`, sondern `FetchState::Failed` im Ergebnis; `Err` nur, wenn es weder Abo noch Konto ist (`Invalid`), die
+    /// Adresse inzwischen in ein gesperrtes Netz zeigt (`Invalid` am Feld `url`) oder der Speicher fehlt.
     async fn refresh_calendar(&self, id: ObjectId) -> Result<Refreshed>;
 
-    /// `event.read`; ein gelöschter Termin ergibt `None` (sichtbar nur über `list` mit `include_deleted`).
+    /// `event.read`; ein gelöschter Termin ergibt `None` (sichtbar nur über `list` mit `Trash::Include`/`Only`).
     async fn get(&self, id: ObjectId) -> Result<Option<Appointment>>;
     /// `event.read` über die `uid`.
     async fn get_by_uid(&self, uid: &str) -> Result<Option<Appointment>>;
@@ -69,6 +74,8 @@ pub trait Appointments: Send + Sync {
     async fn search(&self, text: &str, after: Option<&Place>, size: usize) -> Result<Page<AppointmentSummary>>;
 
     /// `event.create`: prüfen und speichern. Abgelehnt, wenn die `uid` schon existiert; `ReadOnly` in einem Abo.
+    /// Für ALLE schreibenden Termin-Methoden (create, update, delete, invite, respond) gilt: liegt der Kalender im
+    /// Papierkorb, ist es `Invalid` am Feld `calendar`, nichts wird geschrieben.
     async fn create(&self, draft: AppointmentDraft) -> Result<Appointment>;
     /// `event.update`, Vergleich-und-Setzen gegen `expected`; `scope` bei Serien (sonst `Whole`).
     /// Verschieben (A8), Erinnerung (A6), Zone (A7), ganztägig (A3) sind Felder dieser Änderung.
@@ -79,10 +86,12 @@ pub trait Appointments: Send + Sync {
     /// `event.restore`: Löschen rückgängig machen, solange `restorable` gilt. `scope` ist derselbe wie beim Löschen
     /// (`This` nimmt die Ausnahme `Excluded` zurück, `ThisAndFollowing` den gekürzten Serienschluss, `Whole` holt den
     /// Termin aus dem Papierkorb); so ist Teil-Löschen umkehrbar. Liegt sein Kalender im Papierkorb: `Invalid`
-    /// (`calendar`), zuerst `restore_calendar`.
+    /// (`calendar`), zuerst `restore_calendar`. Ein Abo-Termin: `ReadOnly` (die Quelle entscheidet beim Abruf).
     async fn restore(&self, id: ObjectId, scope: SeriesScope) -> Result<Appointment>;
     /// `trash.purge`: einen Termin oder Kalender (samt Terminen) im Papierkorb endgültig löschen, mit Verlauf
-    /// (ADR 0073 "wirklich löschen"; der Weg bei `Restorable::Manual`). Nicht im Papierkorb: `Invalid`.
+    /// (ADR 0073 "wirklich löschen"; der Weg bei `Restorable::Manual`). Nicht im Papierkorb: `Invalid`; aufbewahrt
+    /// (`Restorable::Held`, auch ein einzelner Termin eines Kalenders): `Forbidden { capability: "trash.purge" }`,
+    /// nichts wird gelöscht. Abo-Termine im Papierkorb dürfen endgültig gelöscht werden.
     async fn purge(&self, id: ObjectId) -> Result<()>;
 
     /// `invite.create`: Personen einladen (Teilnehmer + Protokoll in einem Schritt). Versand (iMIP) ist
@@ -93,10 +102,11 @@ pub trait Appointments: Send + Sync {
     /// Anbieters (die fragende Person), nicht dieses Aufrufs.
     #[allow(clippy::too_many_arguments)]
     async fn respond(&self, id: ObjectId, expected: Revision, who: &PersonRef, answer: Answer, comment: Option<&str>, proposal: Option<When>, scope: SeriesScope) -> Result<Appointment>;
-    /// `event.freebusy`: belegte Zeiten von Teilnehmern (Personen, Räume, Ressourcen) im Fenster.
+    /// `event.freebusy`: Verfügbarkeit von Teilnehmern (Personen, Räume, Ressourcen) im Fenster, je Teilnehmer genau
+    /// ein Eintrag in der Reihenfolge von `who`: belegt (ohne Titel), nicht freigegeben oder unbekannt, nie geraten.
     /// `view_zone`: Zone des Betrachters; legt die Lage von `AllDay` und `Floating` fest (wie bei `window`).
-    /// Erweiterungspunkt Terminfindung (siehe `mod.rs`): eine spätere Abstimmung verbraucht genau diese Methode.
-    async fn free_busy(&self, who: &[Attendee], from: Utc, to: Utc, view_zone: &Zone) -> Result<Vec<Busy>>;
+    /// Erweiterungspunkt Terminfindung (siehe `mod.rs`): die Suite verbraucht genau diese Methode.
+    async fn free_busy(&self, who: &[Attendee], from: Utc, to: Utc, view_zone: &Zone) -> Result<Vec<Availability>>;
 
     /// `event.history`: typisiertes Protokoll eines Termins oder Kalenders, älteste zuerst.
     async fn history(&self, id: ObjectId, after: Option<&Place>, size: usize) -> Result<Page<HistoryEntry>>;

@@ -2,7 +2,7 @@
 //!
 //! Pattern: Adapter (Formate und Personenverzeichnis an der Grenze, hinter Traits); jede Methode ist Pflicht.
 
-use super::{FileRef, MediaType, ObjectId, PersonRef, Problem, Reference, Result, Zone};
+use super::{ContactAddress, FileRef, MediaType, ObjectId, PersonRef, Problem, Reference, Result, Zone};
 use async_trait::async_trait;
 
 /// Fähigkeit eines Formats je Richtung.
@@ -64,10 +64,12 @@ pub trait Exchange: Send + Sync {
 /// Adapter im Programm.
 #[async_trait]
 pub trait PersonDirectory: Send + Sync {
-    /// Person zu einer Adresse (`mailto:…`), wenn bekannt.
-    async fn find_by_address(&self, uri: &str) -> Result<Option<PersonRef>>;
-    /// Unbekannte Adresse: Eintrag in der lokalen Ablage im Zustand "vorgeschlagen" (nie freier Name).
-    async fn propose(&self, display_hint: &str, uri: &str) -> Result<PersonRef>;
+    /// Person zu einer Adresse (`mailto:…`), wenn bekannt. Typisiert (`ContactAddress`, fs-types): das Schema ist
+    /// geprüft, der Vergleich (Schema/Domain ohne Groß-/Kleinschreibung) ist Regel des Anbieters.
+    async fn find_by_address(&self, address: &ContactAddress) -> Result<Option<PersonRef>>;
+    /// Unbekannte Adresse: Eintrag in der lokalen Ablage im Zustand "vorgeschlagen" (nie freier Name); auch Gäste
+    /// einer Terminumfrage ohne Konto bekommen so einen `PersonRef` (`Profile`).
+    async fn propose(&self, display_hint: &str, address: &ContactAddress) -> Result<PersonRef>;
     /// Anzeigename und Adresse für die Oberfläche (aktuell, nicht eingefroren).
     async fn display(&self, person: &PersonRef) -> Result<Option<(String, Option<String>)>>;
 }

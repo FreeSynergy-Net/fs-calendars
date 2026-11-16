@@ -4,7 +4,7 @@
 
 use super::{
     Alert, Channel, FreeBusy, Link, LocalDateTime, Localization, Location, ObjectId, Origin, Participant, Privacy,
-    RecurrenceRule, Related, Revision, Status, TextType, Utc, VirtualLocation, When,
+    Recurrence, Related, Revision, Status, TextType, Utc, VirtualLocation, When,
 };
 
 /// Der Termin (`JSCalendar` `Event`), vollständig typisiert.
@@ -31,13 +31,14 @@ pub struct Appointment {
     pub categories: Vec<String>,
     pub locations: Vec<Location>,
     pub virtual_locations: Vec<VirtualLocation>,
+    /// Anhänge und Verweise; auch der Rückverweis auf eine Terminumfrage (fs-forms, IRI), kein eigenes Feld.
     pub links: Vec<Link>,
     pub participants: Vec<Participant>,
     pub reply_to: Vec<Channel>,
     pub alerts: Vec<Alert>,
     pub use_default_alerts: bool,
-    pub recurrence: Vec<RecurrenceRule>,
-    pub excluded_recurrence: Vec<RecurrenceRule>,
+    pub recurrence: Vec<Recurrence>,
+    pub excluded_recurrence: Vec<Recurrence>,
     pub overrides: Vec<Override>,
     pub related: Vec<Related>,
     pub localizations: Vec<Localization>,
@@ -79,15 +80,16 @@ pub struct AppointmentPatch {
     pub participants: Option<Vec<Participant>>,
     pub alerts: Option<Vec<Alert>>,
     pub use_default_alerts: Option<bool>,
-    pub recurrence: Option<Vec<RecurrenceRule>>,
-    pub excluded_recurrence: Option<Vec<RecurrenceRule>>,
+    pub recurrence: Option<Vec<Recurrence>>,
+    pub excluded_recurrence: Option<Vec<Recurrence>>,
     pub localizations: Option<Vec<Localization>>,
 }
 
 /// Eine Ausnahme einer Serie, benannt durch die ursprüngliche lokale Startzeit des Vorkommens.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Override { pub recurrence_id: LocalDateTime, pub change: OverrideChange }
-/// Ausnahme: Vorkommen fällt aus, oder es weicht ab.
+/// Ausnahme: Vorkommen fällt aus, oder es weicht ab. In `Changed` sind `recurrence` und `excluded_recurrence` nicht
+/// erlaubt (`Invalid`).
 #[derive(Clone, Debug, PartialEq)]
 pub enum OverrideChange { Excluded, Changed(AppointmentPatch) }
 

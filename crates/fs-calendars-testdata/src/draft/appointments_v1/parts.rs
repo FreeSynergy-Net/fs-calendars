@@ -13,10 +13,13 @@ use super::{Attendee, FileRef, MediaType, Reference, Utc, Zone};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)] pub enum Relation { First, Next, Child, Parent }
 
 // Wiederholungsregel (RFC 8984 `RecurrenceRule`), Wochentag, Häufigkeit, Überspringen, `NDay`, `ByMonth`, `RuleEnd`
-// kommen aus fs-jscalendar (Typ-Tausch; formgleich mit dem früheren Stand-in, geteilt mit fs-tasks). Eine Regel außerhalb
-// der Teilmenge, die der Anbieter rechnen kann, steht NICHT hier: sie bleibt im Original (`Origin.original`), der Termin
-// zeigt nur das erste Vorkommen, Bearbeiten der Regel ist `Unsupported` (PLAN.md §11, Teil 2).
-pub use fs_jscalendar::recurrence::{ByMonth, Frequency, NDay, RecurrenceRule, RuleEnd, Skip, Weekday};
+// kommen aus fs-jscalendar (Typ-Tausch; formgleich mit dem früheren Stand-in, geteilt mit fs-tasks). Im Termin steht je
+// Regel ein `Recurrence` wie in tasks_v1: `Rule` (in der Teilmenge, die der Anbieter rechnet) oder `Original` (der empfangene
+// RRULE-Text Byte für Byte, ADR 0030): so bleibt eine fremde Regel auch nach einer Änderung an anderen Feldern im Export
+// erhalten und die Serie wird nie still zum Einzeltermin. Eine `Original`-Regel zeigt nur das erste Vorkommen ("Serie nur
+// teilweise darstellbar"); unverändert zurückgeben ist erlaubt, sie ändern oder eine neue `Original` anlegen ist
+// `Unsupported` (PLAN.md §11, Teil 2).
+pub use fs_jscalendar::recurrence::{ByMonth, Frequency, NDay, Recurrence, RecurrenceRule, RuleEnd, Skip, Weekday};
 
 /// Wohin eine Einladung oder Antwort geht (`sendTo` / `replyTo`): Methode (`imip`, `other`) und URI.
 #[derive(Clone, Debug, PartialEq, Eq)]

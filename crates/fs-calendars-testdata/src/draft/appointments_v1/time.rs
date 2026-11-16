@@ -25,5 +25,5 @@ pub enum When {
 // Herkunft eines importierten Objekts (fs-objects `object_origin`, nur lesend) und ihr Kanal kommen aus fs-jscalendar
 // (Typ-Tausch; formgleich mit dem früheren Stand-in, auch für fs-tasks). "Unverändert seit Import" wird berechnet:
 // `revision == rev_at_import`; der Dateiname zählt nie (ADR 0085 Abschnitt 1). Kanal `Subscription`: `source` ist die
-// Feed-IRI des Abo-Kalenders (`CalendarSource::Subscribed`), nicht der Dateihash. JMAP gibt es bewusst nicht in v1.
+// IRI des Abo-KALENDERS, nie die (womöglich geheime) Feed-Adresse (`Subscription`). JMAP gibt es bewusst nicht in v1.
 pub use fs_jscalendar::origin::{Origin, OriginChannel};
