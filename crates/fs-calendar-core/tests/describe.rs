@@ -119,7 +119,7 @@ fn the_description_has_exactly_the_commands_of_the_table_and_they_are_marked() {
         "flexibleBlock",
     ] {
         assert!(!support::is_supported(n), "{n}");
-        assert!(!support::find(n).unwrap().reason.is_empty());
+        assert_ne!(support::find(n).unwrap().reason.len(), 0);
     }
     assert!(!support::is_supported("nothing"));
 }
@@ -130,7 +130,7 @@ fn change_is_an_edit_and_create_has_the_fields() {
     let change = t.find_command("change").unwrap();
     assert_eq!(change.kind, CommandKind::Change);
     // the rule of the schema: the input of a change is an `Edit`, the list of input fields is empty
-    assert!(change.input.is_empty());
+    assert_eq!(change.input.len(), 0);
     let create = t.find_command("create").unwrap();
     assert!(create.input.iter().any(|f| f.name == "start" && f.required));
     assert_eq!(create.input.len(), t.fields.len());
@@ -147,7 +147,7 @@ fn what_the_fields_do_not_carry_is_named() {
             t.find_field(name).is_none(),
             "{name} is described after all"
         );
-        assert!(!reason.is_empty());
+        assert_ne!(reason.len(), 0);
     }
 }
 
