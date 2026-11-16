@@ -143,3 +143,27 @@ async fn this_and_following_at_the_first_occurrence_acts_like_the_whole_series()
         "any scope takes a trashed series back"
     );
 }
+
+#[tokio::test]
+async fn deleting_a_changed_occurrence_and_restoring_it_gives_the_change_back() {
+    let f = fx().await;
+    let a = weekly(&f).await;
+    let moved = AppointmentPatch {
+        title: Some("verlegt".into()),
+        ..AppointmentPatch::default()
+    };
+    let u = f.p.update(a.id, a.revision, moved, this(9)).await.unwrap();
+    f.p.delete(a.id, u.revision, this(9)).await.unwrap();
+    assert_eq!(starts(&days(&f).await).len(), 4);
+    let back = f.p.restore(a.id, this(9)).await.unwrap();
+    assert_eq!(
+        back.overrides, u.overrides,
+        "the change of the 9th is not lost"
+    );
+    let w = days(&f).await;
+    assert_eq!(
+        w.instances.iter().filter(|i| i.title == "verlegt").count(),
+        1
+    );
+    assert_eq!(f.count("calendar_appointment").await, 2);
+}

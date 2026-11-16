@@ -29,9 +29,11 @@ pub struct Cut {
     /// Whether the cut was `ThisAndFollowing` (else `This`).
     pub following: bool,
     pub until: Utc,
+    /// The revision right after the cut: a later change of the series makes `restore(ThisAndFollowing)` report `Changed`.
+    pub rev_after: Revision,
     /// The rules before the cut (`ThisAndFollowing` only).
     pub recurrence: Vec<RecurrenceRule>,
-    /// The overrides the cut removed (`ThisAndFollowing` only).
+    /// The overrides the cut removed or replaced (a deleted changed occurrence gets its change back).
     pub overrides: Vec<Override>,
 }
 

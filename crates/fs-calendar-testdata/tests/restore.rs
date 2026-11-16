@@ -71,7 +71,7 @@ async fn restore_after_the_period_or_without_a_delete_is_refused() {
     f.set_now(utc(2027, 3, 1, 0, 0));
     assert!(matches!(
         f.restore(a.id, scope).await,
-        Err(Error::Invalid(_))
+        Err(Error::NotFound(_))
     ));
 }
 
@@ -104,4 +104,71 @@ async fn respond_compares_against_expected() {
         )
         .await;
     assert!(ok.is_ok());
+}
+
+#[tokio::test]
+async fn restore_of_a_deleted_changed_occurrence_gives_the_change_back() {
+    let (s, f) = loaded();
+    let a = s.get("weekly");
+    let scope = SeriesScope::This {
+        recurrence_id: at(2026, 11, 18, 10, 0),
+    };
+    f.delete(a.id, a.revision, scope).await.unwrap();
+    let back = f.restore(a.id, scope).await.unwrap();
+    let was = a
+        .overrides
+        .iter()
+        .find(|o| o.recurrence_id == at(2026, 11, 18, 10, 0));
+    assert!(
+        was.is_some() && back.overrides.iter().any(|o| Some(o) == was),
+        "the moved occurrence is back as it was"
+    );
+}
+
+#[tokio::test]
+async fn restore_this_and_following_reports_changed_after_a_later_change_and_the_period_is_a_closed_bound()
+ {
+    let (s, f) = loaded();
+    let a = s.get("weekly");
+    let scope = SeriesScope::ThisAndFollowing {
+        recurrence_id: at(2026, 11, 25, 10, 0),
+    };
+    f.delete(a.id, a.revision, scope).await.unwrap();
+    let cur = f.get(a.id).await.unwrap().unwrap();
+    let patch = fs_calendar_testdata::draft::AppointmentPatch {
+        title: Some("Neu".into()),
+        ..fs_calendar_testdata::draft::AppointmentPatch::default()
+    };
+    let changed = f
+        .update(a.id, cur.revision, patch, SeriesScope::Whole)
+        .await
+        .unwrap();
+    let r = f.restore(a.id, scope).await;
+    assert!(
+        matches!(r, Err(Error::Changed { current }) if current == changed.revision),
+        "{r:?}"
+    );
+    // The bound: exactly at `deleted + period` the restore is over (Local: `purge_after <= now`).
+    let at_ms = |delta: i64| {
+        let (s2, f2) = loaded();
+        let b = s2.get("weekly").clone();
+        let this = SeriesScope::This {
+            recurrence_id: at(2026, 11, 16, 10, 0),
+        };
+        (f2, b, this, delta)
+    };
+    for (delta, ok) in [(-1_i64, true), (0, false)] {
+        let (f2, b, this, d) = at_ms(delta);
+        let until = f2
+            .delete(b.id, b.revision, this)
+            .await
+            .unwrap()
+            .restorable_until
+            .unwrap();
+        f2.set_now(fs_calendar_testdata::draft::Utc::from_millis(
+            until.millis() + d,
+        ));
+        let r = f2.restore(b.id, this).await;
+        assert_eq!(r.is_ok(), ok, "delta {delta}: {r:?}");
+    }
 }

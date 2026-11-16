@@ -238,7 +238,7 @@ async fn restore_after_the_period_is_refused() {
     ));
     assert!(matches!(
         f.restore(a.id, SeriesScope::Whole).await,
-        Err(Error::Invalid(_))
+        Err(Error::NotFound(_))
     ));
 }
 

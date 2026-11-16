@@ -16,7 +16,7 @@ use crate::cuts::{save_cut, take_cut};
 use crate::envelope::{bump, log, trash, trash_days};
 use crate::read::load;
 use crate::scope_ops::live;
-use crate::series::{hide, put_exception, remove_exception, unhide};
+use crate::series::{hide, put_exception, unexclude, unhide};
 use crate::store::Conn;
 use crate::write::write_appointment;
 
@@ -160,7 +160,7 @@ pub async fn restore_partial(
         .iter()
         .any(|o| o.recurrence_id == rid && o.change == OverrideChange::Excluded)
     {
-        remove_exception(c, id, rid).await?;
+        unexclude(c, id, rid).await?;
     }
     bump(c, id, cur.revision, None, now).await?;
     log(

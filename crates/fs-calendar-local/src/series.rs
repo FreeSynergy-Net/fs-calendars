@@ -14,7 +14,9 @@ use fs_calendar_testdata::zone::naive;
 
 use crate::calendar_tables::{APPOINTMENT, OVERRIDE};
 use crate::clock::new_id;
-use crate::codec::{get_id, get_text, id_value, int, int_to_local, invalid, local_to_int, text};
+use crate::codec::{
+    get_id, get_int, get_text, id_value, int, int_to_local, invalid, local_to_int, text,
+};
 use crate::envelope::insert;
 use crate::read::{Rd, fill, head, select};
 use crate::store::Conn;
@@ -72,6 +74,15 @@ pub async fn put_exception(
     let at = naive(o.recurrence_id)
         .ok_or_else(|| invalid("scope.recurrence_id", "no such date or time"))?;
     let existing = exception_id(c, master.id, o.recurrence_id).await?;
+    if let (Some(e), OverrideChange::Excluded) = (existing, &o.change) {
+        // A changed occurrence that is deleted keeps its row and its fields: `restore` gives the change back.
+        c.exec(
+            "UPDATE calendar_appointment SET excluded = 1 WHERE id = ?",
+            vec![id_value(e)],
+        )
+        .await?;
+        return Ok(());
+    }
     let eid = existing.unwrap_or_else(|| new_id(now));
     let mut m = master.clone();
     m.id = eid;
@@ -176,6 +187,32 @@ pub async fn read_overrides(c: &Conn<'_>, master: ObjectId) -> Result<Vec<Overri
         });
     }
     Ok(out)
+}
+
+/// Undo the delete of one occurrence: a changed exception that was only marked excluded is back as it was, a pure
+/// `Excluded` exception is removed.
+///
+/// # Errors
+/// The engine's error.
+pub async fn unexclude(c: &Conn<'_>, master: ObjectId, rid: LocalDateTime) -> Result<()> {
+    let Some(e) = exception_id(c, master, rid).await? else {
+        return Ok(());
+    };
+    let n = c
+        .query(
+            "SELECT count(*) FROM calendar_override_field WHERE appointment = ?",
+            vec![id_value(e)],
+        )
+        .await?;
+    if n.first().map(|r| get_int(r, 0)).transpose()?.unwrap_or(0) > 0 {
+        c.exec(
+            "UPDATE calendar_appointment SET excluded = 0 WHERE id = ?",
+            vec![id_value(e)],
+        )
+        .await?;
+        return Ok(());
+    }
+    remove_exception(c, master, rid).await
 }
 
 /// Remove the exception of one occurrence (envelope and rows).

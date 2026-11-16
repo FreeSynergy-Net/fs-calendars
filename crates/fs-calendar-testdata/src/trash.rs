@@ -44,14 +44,12 @@ pub fn delete(
         SeriesScope::This { recurrence_id } => {
             occurrence(&cur, recurrence_id)?;
             let until = Utc::from_millis(state.now.millis() + TRASH_MS);
-            state.cuts.push(Cut {
-                id,
-                recurrence_id,
-                following: false,
-                until,
-                recurrence: Vec::new(),
-                overrides: Vec::new(),
-            });
+            let prior: Vec<Override> = cur
+                .overrides
+                .iter()
+                .filter(|o| o.recurrence_id == recurrence_id)
+                .cloned()
+                .collect();
             let mut new = cur.clone();
             upsert(
                 &mut new,
@@ -60,7 +58,16 @@ pub fn delete(
                     change: OverrideChange::Excluded,
                 },
             );
-            commit(state, cur.revision, new, HistoryKind::Delete, Vec::new());
+            let done = commit(state, cur.revision, new, HistoryKind::Delete, Vec::new());
+            state.cuts.push(Cut {
+                id,
+                recurrence_id,
+                following: false,
+                until,
+                rev_after: done.revision,
+                recurrence: Vec::new(),
+                overrides: prior,
+            });
             Ok(Deleted {
                 id,
                 scope,
@@ -81,15 +88,16 @@ pub fn delete(
                 .filter(|o| !new.overrides.contains(o))
                 .cloned()
                 .collect();
+            let done = commit(state, cur.revision, new, HistoryKind::Delete, Vec::new());
             state.cuts.push(Cut {
                 id,
                 recurrence_id,
                 following: true,
                 until,
+                rev_after: done.revision,
                 recurrence: cur.recurrence.clone(),
                 overrides: removed,
             });
-            commit(state, cur.revision, new, HistoryKind::Delete, Vec::new());
             Ok(Deleted {
                 id,
                 scope,
@@ -108,8 +116,8 @@ pub fn delete(
 pub fn restore(state: &mut State, id: ObjectId, scope: SeriesScope) -> Result<Appointment> {
     let item = state.items.get(&id).ok_or(Error::NotFound(id))?.clone();
     if let Some(at) = item.deleted {
-        if state.now.millis() > at.millis() + TRASH_MS {
-            return Err(invalid("id", "the restore period is over"));
+        if state.now.millis() >= at.millis() + TRASH_MS {
+            return Err(Error::NotFound(id));
         }
         return Ok(commit(
             state,
@@ -133,10 +141,16 @@ pub fn restore(state: &mut State, id: ObjectId, scope: SeriesScope) -> Result<Ap
     else {
         return Err(invalid("scope", "nothing was deleted there"));
     };
-    let cut = state.cuts.remove(pos);
-    if state.now.millis() > cut.until.millis() {
-        return Err(invalid("scope", "the restore period is over"));
+    if state.now.millis() >= state.cuts[pos].until.millis() {
+        state.cuts.remove(pos);
+        return Err(Error::NotFound(id));
     }
+    if following && state.cuts[pos].rev_after != item.appt.revision {
+        return Err(Error::Changed {
+            current: item.appt.revision,
+        });
+    }
+    let cut = state.cuts.remove(pos);
     let mut new = item.appt.clone();
     if following {
         new.recurrence = cut.recurrence;
@@ -146,6 +160,9 @@ pub fn restore(state: &mut State, id: ObjectId, scope: SeriesScope) -> Result<Ap
     } else {
         new.overrides
             .retain(|o| !(o.recurrence_id == rid && o.change == OverrideChange::Excluded));
+        for o in cut.overrides {
+            upsert(&mut new, o);
+        }
     }
     Ok(commit(
         state,
