@@ -229,8 +229,10 @@ impl Conn<'_> {
         if !self.in_tx {
             return r;
         }
-        self.in_tx = false;
-        match r {
+        // `in_tx` stays true until the engine has answered: a future cancelled before that point is dropped with
+        // `in_tx` set, so `Drop` marks the connection and the next access rolls back (K1).
+        Suspend(false).await;
+        let out = match r {
             Ok(v) => match self.guard.execute("COMMIT", ()).await {
                 Ok(_) => Ok(v),
                 Err(e) => {
@@ -242,6 +244,26 @@ impl Conn<'_> {
                 let _ = self.guard.execute("ROLLBACK", ()).await;
                 Err(e)
             }
+        };
+        self.in_tx = false;
+        out
+    }
+}
+
+/// Gives the scheduler one turn (a real suspension point, so that a cancel there can be tested).
+struct Suspend(bool);
+
+impl std::future::Future for Suspend {
+    type Output = ();
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<()> {
+        if self.0 {
+            return std::task::Poll::Ready(());
         }
+        self.0 = true;
+        cx.waker().wake_by_ref();
+        std::task::Poll::Pending
     }
 }
