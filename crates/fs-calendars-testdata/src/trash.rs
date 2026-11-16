@@ -9,7 +9,7 @@ use crate::draft::{
 use crate::instances::series_start;
 use crate::scope::{checked, commit, invalid, occurrence, truncate, upsert};
 use crate::state::Cut;
-use crate::state::{Item, State, TRASH_MS};
+use crate::state::{Item, State};
 
 /// Delete with a scope: the whole thing goes to the trash; one occurrence becomes an `Excluded` override;
 /// this and the following cut the series.
@@ -24,26 +24,27 @@ pub fn delete(
 ) -> Result<Deleted> {
     let cur = checked(state, id, Some(expected))?;
     let whole = |state: &mut State, cur: &Appointment| {
-        let until = Some(Utc::from_millis(state.now.millis() + TRASH_MS));
+        let at = state.now;
         state.items.insert(
             cur.id,
             Item {
                 appt: cur.clone(),
-                deleted: Some(state.now),
+                deleted: Some(at),
+                via_calendar: false,
             },
         );
         state.record(cur, HistoryKind::Delete, Vec::new());
         Deleted {
             id: cur.id,
             scope,
-            restorable_until: until,
+            restorable: state.restorable(&[cur.id], at),
         }
     };
     match scope {
         SeriesScope::Whole => Ok(whole(state, &cur)),
         SeriesScope::This { recurrence_id } => {
             occurrence(&cur, recurrence_id)?;
-            let until = Utc::from_millis(state.now.millis() + TRASH_MS);
+            let until = cut_end(state);
             let prior: Vec<Override> = cur
                 .overrides
                 .iter()
@@ -71,7 +72,7 @@ pub fn delete(
             Ok(Deleted {
                 id,
                 scope,
-                restorable_until: Some(until),
+                restorable: state.restorable(&[], state.now),
             })
         }
         SeriesScope::ThisAndFollowing { recurrence_id } => {
@@ -79,7 +80,7 @@ pub fn delete(
             if series_start(&cur.when) == Some(at) {
                 return Ok(whole(state, &cur));
             }
-            let until = Utc::from_millis(state.now.millis() + TRASH_MS);
+            let until = cut_end(state);
             let mut new = cur.clone();
             truncate(&mut new, at);
             let removed = cur
@@ -101,10 +102,20 @@ pub fn delete(
             Ok(Deleted {
                 id,
                 scope,
-                restorable_until: Some(until),
+                restorable: state.restorable(&[], state.now),
             })
         }
     }
+}
+
+/// When a partial delete (`This`, `ThisAndFollowing`) can no longer be undone: the period (far away for "never").
+fn cut_end(state: &State) -> Utc {
+    Utc::from_millis(
+        state
+            .now
+            .millis()
+            .saturating_add(state.period_ms.unwrap_or(i64::MAX / 4)),
+    )
 }
 
 /// Bring a deletion back while the trash still holds it. `Whole` (or any scope for a trashed appointment,
@@ -112,13 +123,26 @@ pub fn delete(
 /// the `Excluded` override; `ThisAndFollowing` gives back the rules and overrides the cut took away.
 ///
 /// # Errors
-/// `NotFound` for an unknown id; `Invalid` when there is nothing to undo or the period is over.
+/// `NotFound` for an unknown id or one whose period is over; `Invalid` when there is nothing to undo or the
+/// calendar is in the trash; `ReadOnly` in a subscription.
 pub fn restore(state: &mut State, id: ObjectId, scope: SeriesScope) -> Result<Appointment> {
     let item = state.items.get(&id).ok_or(Error::NotFound(id))?.clone();
-    if let Some(at) = item.deleted {
-        if state.now.millis() >= at.millis() + TRASH_MS {
-            return Err(Error::NotFound(id));
-        }
+    if !state.may_see(item.appt.calendar) {
+        return Err(Error::NotFound(id));
+    }
+    if state.cal_deleted.contains_key(&item.appt.calendar) {
+        return Err(invalid(
+            "calendar",
+            "is in the trash: restore the calendar first",
+        ));
+    }
+    if let crate::draft::CalendarSource::Subscribed(_) = state.calendar(item.appt.calendar)?.source
+    {
+        return Err(Error::ReadOnly {
+            calendar: item.appt.calendar,
+        });
+    }
+    if item.deleted.is_some() {
         return Ok(commit(
             state,
             item.appt.revision,

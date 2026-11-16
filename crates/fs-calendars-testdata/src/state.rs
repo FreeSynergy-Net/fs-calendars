@@ -2,12 +2,13 @@
 //!
 //! Pattern: Repository state (one value behind one lock); plain data, no behaviour but small helpers.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::net::IpAddr;
 
 use crate::draft::{
-    Appointment, AppointmentPatch, CalendarInfo, Change, Error, FieldChange, FreeBusy,
-    HistoryEntry, HistoryKind, LocalDateTime, ObjectId, Override, PersonRef, Privacy,
-    RecurrenceRule, Result, Revision, Status, TextType, Utc, When,
+    Appointment, AppointmentPatch, BasicValue, CalendarInfo, CalendarSource, Change, Error,
+    FieldChange, FreeBusy, HistoryEntry, HistoryKind, LocalDateTime, ObjectId, Override, PersonRef,
+    Privacy, Recurrence, Result, Revision, Status, TextType, Utc, When,
 };
 use crate::ids::{object_id, person};
 use crate::zone::CustomZones;
@@ -19,6 +20,8 @@ pub struct Item {
     pub appt: Appointment,
     /// Set when deleted as a whole.
     pub deleted: Option<Utc>,
+    /// Deleted together with its calendar (only `restore_calendar` brings it back).
+    pub via_calendar: bool,
 }
 
 /// What a partial delete (`This`, `ThisAndFollowing`) took away, so `restore` can give it back.
@@ -32,7 +35,7 @@ pub struct Cut {
     /// The revision right after the cut: a later change of the series makes `restore(ThisAndFollowing)` report `Changed`.
     pub rev_after: Revision,
     /// The rules before the cut (`ThisAndFollowing` only).
-    pub recurrence: Vec<RecurrenceRule>,
+    pub recurrence: Vec<Recurrence>,
     /// The overrides the cut removed or replaced (a deleted changed occurrence gets its change back).
     pub overrides: Vec<Override>,
 }
@@ -52,6 +55,22 @@ pub struct State {
     pub cuts: Vec<Cut>,
     /// The person who asks and who acts (`actor` in the log, `my_status` in instances).
     pub viewer: PersonRef,
+    /// Calendars in the trash and when they went in.
+    pub cal_deleted: BTreeMap<ObjectId, Utc>,
+    /// The trash period in ms; `None` = "never delete automatically" (the setting of the program, not the trait).
+    pub period_ms: Option<i64>,
+    /// Retention (`keep_until`): the end (`None` = no end) per appointment or calendar.
+    pub holds: HashMap<ObjectId, Option<Utc>>,
+    /// People (`urn:uuid:...`) the provider knows as AI accounts.
+    pub ai_people: HashSet<String>,
+    /// The calendars an asking AI was invited to (all others are `NotFound` for it).
+    pub ai_calendars: HashSet<ObjectId>,
+    /// People (`urn:uuid:...`) and resources who share their free/busy times with the asker.
+    pub shared: HashSet<String>,
+    /// What a feed or account address delivers when fetched (`title`, `uid`) per address.
+    pub feeds: HashMap<String, Vec<(String, String)>>,
+    /// Host names the fake "resolves"; every other name resolves to a public address.
+    pub dns: HashMap<String, IpAddr>,
 }
 
 /// Milliseconds the trash keeps a deleted appointment (30 days, like Google).
@@ -68,6 +87,8 @@ impl State {
             color: None,
             default_zone: None,
             owner: owner.clone(),
+            source: CalendarSource::Own,
+            trash: None,
             revision: Revision(1),
         };
         Self {
@@ -81,6 +102,14 @@ impl State {
             damaged: HashMap::new(),
             cuts: Vec::new(),
             viewer: owner,
+            cal_deleted: BTreeMap::new(),
+            period_ms: Some(TRASH_MS),
+            holds: HashMap::new(),
+            ai_people: HashSet::new(),
+            ai_calendars: HashSet::new(),
+            shared: HashSet::new(),
+            feeds: HashMap::new(),
+            dns: HashMap::new(),
         }
     }
 
@@ -90,15 +119,33 @@ impl State {
         object_id(self.next)
     }
 
-    /// A live (not trashed) item, or `NotFound`.
+    /// A live (not trashed) item, or `NotFound`: of its calendar when that is in the trash (like a task in a
+    /// deleted list), of the item itself when it is unknown, trashed or hidden from an asking AI.
     ///
     /// # Errors
-    /// `NotFound` for an unknown or trashed id.
+    /// `NotFound`.
     pub fn live(&self, id: ObjectId) -> Result<&Item> {
-        self.items
-            .get(&id)
-            .filter(|i| i.deleted.is_none())
-            .ok_or(Error::NotFound(id))
+        let item = self.items.get(&id).ok_or(Error::NotFound(id))?;
+        let cal = item.appt.calendar;
+        if self.cal_deleted.contains_key(&cal) {
+            return Err(Error::NotFound(cal));
+        }
+        if item.deleted.is_some() || !self.may_see(cal) {
+            return Err(Error::NotFound(id));
+        }
+        Ok(item)
+    }
+
+    /// Whether the asker is an AI account.
+    #[must_use]
+    pub fn asker_is_ai(&self) -> bool {
+        self.ai_people.contains(&self.viewer.id.canonical())
+    }
+
+    /// Whether the asker may see this calendar (an AI only sees the calendars it was invited to).
+    #[must_use]
+    pub fn may_see(&self, calendar: ObjectId) -> bool {
+        !self.asker_is_ai() || self.ai_calendars.contains(&calendar)
     }
 
     /// Write one entry to the log and one to the change feed.
@@ -114,7 +161,7 @@ impl State {
             },
         ));
         self.changes.push(Change {
-            appointment: a.id,
+            appointment: Some(a.id),
             calendar: a.calendar,
             kind,
             at,

@@ -1,23 +1,25 @@
 //! `impl Appointments for FakeAppointments`: one line per method, the work is in the other files.
 //!
-//! Pattern: Adapter (trait to the inherent methods). `free_busy` is not overridden: it answers `Unsupported`.
+//! Pattern: Adapter (trait to the inherent methods).
 
 use async_trait::async_trait;
 
 use crate::draft::{
     Answer, Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, AppointmentSummary,
-    Appointments, CAPABILITIES, CalendarInfo, Capabilities, Change, Deleted, HistoryEntry, Invitee,
-    ObjectId, Page, PersonRef, Place, Result, Revision, SeriesScope, Utc, When, Window, Zone,
+    Appointments, Attendee, Availability, CAPABILITIES, CalendarDeleted, CalendarInfo,
+    CalendarPatch, Capabilities, Change, Deleted, HistoryEntry, Invitee, ObjectId, Page, PersonRef,
+    Place, Reference, Refresh, Refreshed, Result, Revision, SeriesScope, Trash, Utc, When, Window,
+    Zone,
 };
 use crate::fake::FakeAppointments;
 
-/// The capability ids a fake offers: all but `event.freebusy`.
+/// The capability ids a fake offers: all of them.
 #[must_use]
 pub fn fake_capabilities() -> Capabilities {
     Capabilities(
         CAPABILITIES
             .iter()
-            .map(|c| ((*c).to_owned(), *c != "event.freebusy"))
+            .map(|c| ((*c).to_owned(), true))
             .collect(),
     )
 }
@@ -27,16 +29,43 @@ impl Appointments for FakeAppointments {
     fn capabilities(&self) -> Capabilities {
         fake_capabilities()
     }
-    async fn calendars(&self) -> Result<Vec<CalendarInfo>> {
-        Ok(self.calendars_impl())
+    async fn calendars(&self, trash: Trash) -> Result<Vec<CalendarInfo>> {
+        Ok(self.calendars_impl(trash))
     }
     async fn create_calendar(
         &self,
         name: &str,
         color: Option<&str>,
         default_zone: Option<Zone>,
+        owner: Option<PersonRef>,
     ) -> Result<CalendarInfo> {
-        self.create_calendar_impl(name, color, default_zone)
+        self.create_calendar_impl(name, color, default_zone, owner)
+    }
+    async fn update_calendar(
+        &self,
+        id: ObjectId,
+        expected: Revision,
+        change: CalendarPatch,
+    ) -> Result<CalendarInfo> {
+        self.update_calendar_impl(id, expected, &change)
+    }
+    async fn delete_calendar(&self, id: ObjectId, expected: Revision) -> Result<CalendarDeleted> {
+        self.delete_calendar_impl(id, expected)
+    }
+    async fn restore_calendar(&self, id: ObjectId) -> Result<CalendarInfo> {
+        self.restore_calendar_impl(id)
+    }
+    async fn subscribe_calendar(
+        &self,
+        name: &str,
+        color: Option<&str>,
+        url: &Reference,
+        refresh: Refresh,
+    ) -> Result<CalendarInfo> {
+        self.subscribe_calendar_impl(name, color, url, refresh)
+    }
+    async fn refresh_calendar(&self, id: ObjectId) -> Result<Refreshed> {
+        self.refresh_calendar_impl(id)
     }
     async fn get(&self, id: ObjectId) -> Result<Option<Appointment>> {
         Ok(self.get_impl(id))
@@ -112,6 +141,18 @@ impl Appointments for FakeAppointments {
         scope: SeriesScope,
     ) -> Result<Appointment> {
         self.respond_impl(id, expected, who, answer, comment, proposal.as_ref(), scope)
+    }
+    async fn purge(&self, id: ObjectId) -> Result<()> {
+        self.purge_impl(id)
+    }
+    async fn free_busy(
+        &self,
+        who: &[Attendee],
+        from: Utc,
+        to: Utc,
+        view_zone: &Zone,
+    ) -> Result<Vec<Availability>> {
+        self.free_busy_impl(who, from, to, view_zone)
     }
     async fn history(
         &self,

@@ -4,8 +4,8 @@
 //! The slug of an appointment is its name in tests; its `uid` is `urn:fs-testdata:<slug>`.
 
 use crate::draft::{
-    Appointment, BasicValue, CalendarInfo, Date, Frequency, LocalDateTime, RecurrenceRule,
-    Revision, RuleEnd, Skip, Span, Weekday, When,
+    Appointment, BasicValue, CalendarInfo, CalendarSource, Date, Frequency, LocalDateTime,
+    RecurrenceRule, Revision, RuleEnd, Skip, Span, Weekday, When,
 };
 use crate::fake::FakeAppointments;
 use crate::ids::{object_id, person};
@@ -21,9 +21,9 @@ pub const CUSTOM_OFFSET: i32 = 5 * 3600 + 30 * 60;
 /// The whole sample.
 #[derive(Clone, Debug)]
 pub struct Sample {
-    /// Two calendars: "Persönlich" (id 1), "Arbeit" (id 2).
+    /// Five calendars: "Persönlich" (1), "Arbeit" (2), a subscription (3), a `CalDAV` account (4), one in the trash (5).
     pub calendars: Vec<CalendarInfo>,
-    /// Four known people: the acting person (1), Ann (2), Ben (3), Clara (4).
+    /// Four known (invented) people: the acting person Lena (1), Marek (2), Selma (3), Jorin (4).
     pub people: Vec<Known>,
     /// The appointments with their slugs, in a fixed order.
     pub appointments: Vec<(&'static str, Appointment)>,
@@ -72,15 +72,19 @@ pub fn sample() -> Sample {
         color: None,
         default_zone: None,
         owner: owner.clone(),
+        source: CalendarSource::Own,
+        trash: None,
         revision: Revision(1),
     };
+    let mut calendars = vec![cal(1, "Persönlich"), cal(2, "Arbeit")];
+    calendars.extend(crate::sample_cals::calendars());
     Sample {
-        calendars: vec![cal(1, "Persönlich"), cal(2, "Arbeit")],
+        calendars,
         people: vec![
-            FakePeople::known(1, "Ich (Test)", "mailto:ich@example.org"),
-            FakePeople::known(2, "Ann Beispiel", "mailto:ann@example.org"),
-            FakePeople::known(3, "Ben Beispiel", "mailto:ben@example.org"),
-            FakePeople::known(4, "Clara Beispiel", "mailto:clara@example.org"),
+            FakePeople::known(1, "Lena Ostrowski", "mailto:lena.ostrowski@example.org"),
+            FakePeople::known(2, "Marek Linde", "mailto:marek.linde@example.org"),
+            FakePeople::known(3, "Selma Brandvik", "mailto:selma.brandvik@example.org"),
+            FakePeople::known(4, "Jorin Falkenau", "mailto:jorin.falkenau@example.org"),
         ],
         appointments: appointments(),
     }

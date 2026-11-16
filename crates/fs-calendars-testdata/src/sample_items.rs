@@ -3,8 +3,8 @@
 //! Pattern: none (data). Dates around "now" (2026-11-16, a Monday); the two zone-change days are real.
 
 use crate::draft::{
-    Appointment, AppointmentPatch, Frequency, NDay, Override, OverrideChange, Privacy, RuleEnd,
-    Utc, Weekday, When,
+    Appointment, AppointmentPatch, Frequency, NDay, Override, OverrideChange, Privacy, Recurrence,
+    RuleEnd, Utc, Weekday, When,
 };
 use crate::ids::object_id;
 use crate::sample::{all_day, at, rule, timed};
@@ -58,6 +58,7 @@ pub fn appointments() -> Vec<(&'static str, Appointment)> {
     series(&mut m);
     crate::sample_people::zone_cases(&mut m);
     crate::sample_people::social(&mut m);
+    crate::sample_cals::calendar_cases(&mut m);
     for i in 1..=30_u32 {
         let slug: &'static str = Box::leak(format!("busy-day-{i:02}").into_boxed_str());
         let (hour, minute) = (
@@ -134,7 +135,7 @@ fn series(m: &mut Maker) {
             let mut r = rule(Frequency::Weekly);
             r.by_day = weekdays(&[Weekday::Mo, Weekday::We]);
             r.end = RuleEnd::Count(20);
-            a.recurrence = vec![r];
+            a.recurrence = vec![Recurrence::Rule(r)];
             a.overrides = vec![
                 Override {
                     recurrence_id: at(2026, 11, 18, 10, 0),
@@ -167,7 +168,7 @@ fn series(m: &mut Maker) {
                 Weekday::Fr,
             ]);
             r.by_set_position = vec![-1];
-            a.recurrence = vec![r];
+            a.recurrence = vec![Recurrence::Rule(r)];
         },
     );
 }

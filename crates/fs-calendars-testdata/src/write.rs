@@ -4,8 +4,8 @@
 
 use crate::check;
 use crate::draft::{
-    Appointment, AppointmentDraft, AppointmentPatch, CalendarInfo, Deleted, Error, HistoryKind,
-    ObjectId, Problem, Result, Revision, SeriesScope, Zone,
+    Appointment, AppointmentDraft, AppointmentPatch, Deleted, Error, HistoryKind, ObjectId,
+    Problem, Result, Revision, SeriesScope,
 };
 use crate::fake::FakeAppointments;
 use crate::patch::{apply, describe};
@@ -13,40 +13,23 @@ use crate::scope;
 use crate::state::{Item, blank};
 use crate::trash;
 
-impl FakeAppointments {
-    pub(crate) fn create_calendar_impl(
-        &self,
-        name: &str,
-        color: Option<&str>,
-        default_zone: Option<Zone>,
-    ) -> Result<CalendarInfo> {
-        if name.trim().is_empty() {
-            return Err(Error::Invalid(vec![Problem {
-                field: "name".to_owned(),
-                reason: "must not be empty".to_owned(),
-            }]));
-        }
-        let mut s = self.lock();
-        if let Some(z) = &default_zone {
-            crate::zone::resolve(z, &s.customs)?;
-        }
-        let info = CalendarInfo {
-            id: s.fresh_id(),
-            name: name.to_owned(),
-            color: color.map(str::to_owned),
-            default_zone,
-            owner: s.viewer.clone(),
-            revision: Revision(1),
-        };
-        s.calendars.push(info.clone());
-        Ok(info)
-    }
+/// A new appointment has no recurrence yet: any `Original` rule in the draft is a new one.
+fn blank_like(draft: &AppointmentDraft) -> Appointment {
+    blank(
+        crate::ids::object_id(0),
+        draft.calendar,
+        String::new(),
+        &draft.title,
+        draft.when.clone(),
+        crate::draft::Utc::from_millis(0),
+    )
+}
 
+impl FakeAppointments {
     pub(crate) fn create_impl(&self, draft: AppointmentDraft) -> Result<Appointment> {
         let mut s = self.lock();
-        if !s.calendars.iter().any(|c| c.id == draft.calendar) {
-            return Err(Error::NotFound(draft.calendar));
-        }
+        s.writable_calendar(draft.calendar)?;
+        crate::scope::no_new_original(&blank_like(&draft), &draft.rest, "event.create")?;
         let id = s.fresh_id();
         let uid = draft.uid.unwrap_or_else(|| {
             format!(
@@ -76,6 +59,7 @@ impl FakeAppointments {
             Item {
                 appt: a.clone(),
                 deleted: None,
+                via_calendar: false,
             },
         );
         Ok(a)

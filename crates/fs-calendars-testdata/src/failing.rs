@@ -6,9 +6,9 @@ use async_trait::async_trait;
 
 use crate::draft::{
     Answer, Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, AppointmentSummary,
-    Appointments, Attendee, Busy, CalendarInfo, Capabilities, Change, Deleted, Error, HistoryEntry,
-    Invitee, ObjectId, Page, PersonRef, Place, Result, Revision, SeriesScope, Utc, When, Window,
-    Zone,
+    Appointments, Attendee, Availability, CalendarDeleted, CalendarInfo, CalendarPatch,
+    Capabilities, Change, Deleted, Error, HistoryEntry, Invitee, ObjectId, Page, PersonRef, Place,
+    Reference, Refresh, Refreshed, Result, Revision, SeriesScope, Trash, Utc, When, Window, Zone,
 };
 
 /// Every method fails with `Error::Unavailable(reason)`.
@@ -47,7 +47,7 @@ impl Appointments for FailingAppointments {
                 .collect(),
         )
     }
-    async fn calendars(&self) -> Result<Vec<CalendarInfo>> {
+    async fn calendars(&self, _: Trash) -> Result<Vec<CalendarInfo>> {
         self.fail()
     }
     async fn create_calendar(
@@ -55,7 +55,37 @@ impl Appointments for FailingAppointments {
         _: &str,
         _: Option<&str>,
         _: Option<Zone>,
+        _: Option<PersonRef>,
     ) -> Result<CalendarInfo> {
+        self.fail()
+    }
+    async fn update_calendar(
+        &self,
+        _: ObjectId,
+        _: Revision,
+        _: CalendarPatch,
+    ) -> Result<CalendarInfo> {
+        self.fail()
+    }
+    async fn delete_calendar(&self, _: ObjectId, _: Revision) -> Result<CalendarDeleted> {
+        self.fail()
+    }
+    async fn restore_calendar(&self, _: ObjectId) -> Result<CalendarInfo> {
+        self.fail()
+    }
+    async fn subscribe_calendar(
+        &self,
+        _: &str,
+        _: Option<&str>,
+        _: &Reference,
+        _: Refresh,
+    ) -> Result<CalendarInfo> {
+        self.fail()
+    }
+    async fn refresh_calendar(&self, _: ObjectId) -> Result<Refreshed> {
+        self.fail()
+    }
+    async fn purge(&self, _: ObjectId) -> Result<()> {
         self.fail()
     }
     async fn get(&self, _: ObjectId) -> Result<Option<Appointment>> {
@@ -122,7 +152,13 @@ impl Appointments for FailingAppointments {
     ) -> Result<Appointment> {
         self.fail()
     }
-    async fn free_busy(&self, _: &[Attendee], _: Utc, _: Utc, _: &Zone) -> Result<Vec<Busy>> {
+    async fn free_busy(
+        &self,
+        _: &[Attendee],
+        _: Utc,
+        _: Utc,
+        _: &Zone,
+    ) -> Result<Vec<Availability>> {
         self.fail()
     }
     async fn history(

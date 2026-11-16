@@ -9,9 +9,9 @@ use async_trait::async_trait;
 
 use crate::draft::{
     Answer, Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, AppointmentSummary,
-    Appointments, Attendee, Busy, CalendarInfo, Capabilities, Change, Deleted, HistoryEntry,
-    Invitee, ObjectId, Page, PersonRef, Place, Result, Revision, SeriesScope, Utc, When, Window,
-    Zone,
+    Appointments, Attendee, Availability, CalendarDeleted, CalendarInfo, CalendarPatch,
+    Capabilities, Change, Deleted, HistoryEntry, Invitee, ObjectId, Page, PersonRef, Place,
+    Reference, Refresh, Refreshed, Result, Revision, SeriesScope, Trash, Utc, When, Window, Zone,
 };
 
 /// `inner` with `delay` before every answer.
@@ -38,18 +38,56 @@ impl<A: Appointments> Appointments for SlowAppointments<A> {
     fn capabilities(&self) -> Capabilities {
         self.inner.capabilities()
     }
-    async fn calendars(&self) -> Result<Vec<CalendarInfo>> {
+    async fn calendars(&self, trash: Trash) -> Result<Vec<CalendarInfo>> {
         self.wait().await;
-        self.inner.calendars().await
+        self.inner.calendars(trash).await
     }
     async fn create_calendar(
         &self,
         name: &str,
         color: Option<&str>,
         zone: Option<Zone>,
+        owner: Option<PersonRef>,
     ) -> Result<CalendarInfo> {
         self.wait().await;
-        self.inner.create_calendar(name, color, zone).await
+        self.inner.create_calendar(name, color, zone, owner).await
+    }
+    async fn update_calendar(
+        &self,
+        id: ObjectId,
+        expected: Revision,
+        change: CalendarPatch,
+    ) -> Result<CalendarInfo> {
+        self.wait().await;
+        self.inner.update_calendar(id, expected, change).await
+    }
+    async fn delete_calendar(&self, id: ObjectId, expected: Revision) -> Result<CalendarDeleted> {
+        self.wait().await;
+        self.inner.delete_calendar(id, expected).await
+    }
+    async fn restore_calendar(&self, id: ObjectId) -> Result<CalendarInfo> {
+        self.wait().await;
+        self.inner.restore_calendar(id).await
+    }
+    async fn subscribe_calendar(
+        &self,
+        name: &str,
+        color: Option<&str>,
+        url: &Reference,
+        refresh: Refresh,
+    ) -> Result<CalendarInfo> {
+        self.wait().await;
+        self.inner
+            .subscribe_calendar(name, color, url, refresh)
+            .await
+    }
+    async fn refresh_calendar(&self, id: ObjectId) -> Result<Refreshed> {
+        self.wait().await;
+        self.inner.refresh_calendar(id).await
+    }
+    async fn purge(&self, id: ObjectId) -> Result<()> {
+        self.wait().await;
+        self.inner.purge(id).await
     }
     async fn get(&self, id: ObjectId) -> Result<Option<Appointment>> {
         self.wait().await;
@@ -145,7 +183,7 @@ impl<A: Appointments> Appointments for SlowAppointments<A> {
         from: Utc,
         to: Utc,
         view_zone: &Zone,
-    ) -> Result<Vec<Busy>> {
+    ) -> Result<Vec<Availability>> {
         self.wait().await;
         self.inner.free_busy(people, from, to, view_zone).await
     }

@@ -1,10 +1,10 @@
-//! Checks before anything is stored: nothing is written when one fails (`Invalid`, `UnknownZone`).
+//! Checks before anything is stored: nothing is written when one fails (`Invalid`; an unknown zone is `Invalid` with `zone.bad`).
 //!
 //! Pattern: none (pure validation, collects all problems of one appointment).
 
-use crate::draft::{Appointment, Error, Problem, Result, When};
+use crate::draft::{Appointment, Error, Problem, Recurrence, Result, When};
 use crate::recur::check as check_rule;
-use crate::zone::{CustomZones, naive, naive_date, resolve};
+use crate::zone::{CustomZones, naive, naive_date, resolve_at};
 
 fn problem(field: &str, reason: &str) -> Problem {
     Problem {
@@ -16,7 +16,7 @@ fn problem(field: &str, reason: &str) -> Problem {
 /// Check one appointment as it would be stored.
 ///
 /// # Errors
-/// `UnknownZone` for a zone that is neither IANA nor registered (never guessed); `Invalid` with every problem found.
+/// `Invalid` with every problem found; a zone that is neither IANA nor registered is `zone.bad` (never guessed).
 pub fn appointment(a: &Appointment, customs: &CustomZones) -> Result<()> {
     let mut problems = Vec::new();
     if a.title.trim().is_empty() {
@@ -29,9 +29,9 @@ pub fn appointment(a: &Appointment, customs: &CustomZones) -> Result<()> {
             end_zone,
             ..
         } => {
-            resolve(zone, customs)?;
+            resolve_at(zone, customs, "when.zone")?;
             if let Some(z) = end_zone {
-                resolve(z, customs)?;
+                resolve_at(z, customs, "when.end_zone")?;
             }
             if naive(*start).is_none() {
                 problems.push(problem("when.start", "no such date or time"));
@@ -55,7 +55,9 @@ pub fn appointment(a: &Appointment, customs: &CustomZones) -> Result<()> {
         }
     }
     for r in a.recurrence.iter().chain(&a.excluded_recurrence) {
-        problems.extend(check_rule(r));
+        if let Recurrence::Rule(rule) = r {
+            problems.extend(check_rule(rule));
+        }
     }
     if a.participants.iter().any(|p| p.key.is_empty()) {
         problems.push(problem("participants.key", "must not be empty"));

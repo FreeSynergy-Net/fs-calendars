@@ -9,8 +9,8 @@ use chrono::{Duration, LocalResult, NaiveDate, NaiveDateTime, Offset, TimeZone, 
 use chrono_tz::Tz;
 
 use crate::draft::{
-    BasicValue, Date, Error, LocalDateTime, Problem, Reference, Result, Span, Utc, When, Zone,
-    ZoneKind,
+    BasicValue, Date, Error, LocalDateTime, Problem, Reference, Result, Span, TypeProblem, Utc,
+    When, Zone, ZoneKind,
 };
 
 /// Custom zones (`/...`, from a `VTIMEZONE`): name to fixed offset in seconds east of UTC.
@@ -25,22 +25,25 @@ pub enum ZoneRule {
     Fixed(i32),
 }
 
-/// Find the rule of a zone; an unknown one is [`Error::UnknownZone`], never guessed.
+/// Find the rule of a zone; an unknown one is `Invalid` at the field `zone`, never guessed.
 ///
 /// # Errors
-/// `UnknownZone` when the name is neither an IANA zone nor a registered custom zone.
+/// `Invalid` (code `zone.bad`) when the name is neither an IANA zone nor a registered custom zone.
 pub fn resolve(zone: &Zone, customs: &CustomZones) -> Result<ZoneRule> {
+    resolve_at(zone, customs, "zone")
+}
+
+/// [`resolve`] with the field the problem names (`when.zone`, `view_zone`, `default_zone` ...).
+///
+/// # Errors
+/// `Invalid` (code `zone.bad`) at `field`; an unknown zone is not an error of its own (typ swap, decision 2a).
+pub fn resolve_at(zone: &Zone, customs: &CustomZones, field: &str) -> Result<ZoneRule> {
     let name = zone.id();
-    match zone.kind() {
-        ZoneKind::Iana => name
-            .parse::<Tz>()
-            .map(ZoneRule::Iana)
-            .map_err(|_| Error::UnknownZone(name.to_owned())),
-        ZoneKind::Custom => customs
-            .get(name)
-            .map(|o| ZoneRule::Fixed(*o))
-            .ok_or_else(|| Error::UnknownZone(name.to_owned())),
-    }
+    let rule = match zone.kind() {
+        ZoneKind::Iana => name.parse::<Tz>().ok().map(ZoneRule::Iana),
+        ZoneKind::Custom => customs.get(name).map(|o| ZoneRule::Fixed(*o)),
+    };
+    rule.ok_or_else(|| Error::Invalid(vec![Problem::from_type(field, TypeProblem::BadZone)]))
 }
 
 /// An IANA-shaped zone; the name need not exist (`resolve` says `UnknownZone`).
@@ -155,7 +158,7 @@ fn invalid(field: &str, reason: &str) -> Error {
 /// they are placed in the zone of the viewer `view` (ADR 0085), so their instants differ per viewer.
 ///
 /// # Errors
-/// `UnknownZone`, or `Invalid` for a date or time that does not exist.
+/// `Invalid` for an unknown zone or for a date or time that does not exist.
 pub fn bounds(when: &When, customs: &CustomZones, view: &Zone) -> Result<(Utc, Utc)> {
     match when {
         When::Timed {
@@ -163,10 +166,12 @@ pub fn bounds(when: &When, customs: &CustomZones, view: &Zone) -> Result<(Utc, U
             zone,
             length,
             ..
-        } => placed(resolve(zone, customs)?, *start, *length),
-        When::Floating { start, length } => placed(resolve(view, customs)?, *start, *length),
+        } => placed(resolve_at(zone, customs, "when.zone")?, *start, *length),
+        When::Floating { start, length } => {
+            placed(resolve_at(view, customs, "view_zone")?, *start, *length)
+        }
         When::AllDay { first, days } => {
-            let rule = resolve(view, customs)?;
+            let rule = resolve_at(view, customs, "view_zone")?;
             let d = naive_date(*first).ok_or_else(|| invalid("when.first", "no such date"))?;
             let s = d.and_time(chrono::NaiveTime::MIN);
             Ok((

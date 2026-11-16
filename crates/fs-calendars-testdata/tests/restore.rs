@@ -4,7 +4,7 @@
 mod common;
 
 use common::{loaded, utc, window};
-use fs_calendars_testdata::draft::{Answer, Appointments, Error, SeriesScope};
+use fs_calendars_testdata::draft::{Answer, Appointments, Error, Restorable, SeriesScope};
 use fs_calendars_testdata::ids::person;
 use fs_calendars_testdata::sample::at;
 
@@ -25,7 +25,7 @@ async fn restore_this_takes_the_excluded_override_back() {
         recurrence_id: at(2026, 11, 16, 10, 0),
     };
     let d = f.delete(a.id, a.revision, scope).await.unwrap();
-    assert!(d.restorable_until.is_some());
+    assert!(matches!(d.restorable, Restorable::Until(_)));
     assert_eq!(count(&window(&f, from, to).await, a.id), before - 1);
     f.restore(a.id, scope).await.unwrap();
     assert_eq!(count(&window(&f, from, to).await, a.id), before);
@@ -159,12 +159,10 @@ async fn restore_this_and_following_reports_changed_after_a_later_change_and_the
     };
     for (delta, ok) in [(-1_i64, true), (0, false)] {
         let (f2, b, this, d) = at_ms(delta);
-        let until = f2
-            .delete(b.id, b.revision, this)
-            .await
-            .unwrap()
-            .restorable_until
-            .unwrap();
+        let Restorable::Until(until) = f2.delete(b.id, b.revision, this).await.unwrap().restorable
+        else {
+            panic!("a period is set")
+        };
         f2.set_now(fs_calendars_testdata::draft::Utc::from_millis(
             until.millis() + d,
         ));

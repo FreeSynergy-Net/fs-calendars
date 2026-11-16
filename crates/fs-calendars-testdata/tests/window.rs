@@ -8,7 +8,7 @@
 mod common;
 
 use common::{loaded, of, utc, window};
-use fs_calendars_testdata::draft::{Appointments, Error, Status};
+use fs_calendars_testdata::draft::{Appointments, Error, Status, Trash};
 
 #[tokio::test]
 async fn timed_appointments_are_placed_in_their_own_zone() {
@@ -54,7 +54,7 @@ async fn custom_zone_uses_its_registered_offset_and_unknown_is_damaged_not_guess
     let w = window(&bare, utc(2026, 11, 20, 0, 0), utc(2026, 11, 21, 0, 0)).await;
     assert!(w.instances.is_empty());
     assert_eq!(w.damaged.len(), 1);
-    assert!(w.damaged[0].reason.contains("UnknownZone"));
+    assert!(w.damaged[0].reason.contains("zone.bad"));
 }
 
 #[tokio::test]
@@ -150,7 +150,7 @@ async fn an_empty_provider_answers_an_empty_window_and_a_bad_window_is_invalid()
             .instances
             .is_empty()
     );
-    assert_eq!(e.calendars().await.unwrap().len(), 2);
+    assert_eq!(e.calendars(Trash::Exclude).await.unwrap().len(), 2);
     assert!(matches!(
         e.window(
             utc(2026, 11, 23, 0, 0),

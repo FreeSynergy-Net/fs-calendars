@@ -9,8 +9,8 @@ mod common;
 
 use common::{loaded, utc, window};
 use fs_calendars_testdata::draft::{
-    Appointment, AppointmentPatch, Appointments, Error, OverrideChange, Relation, RuleEnd,
-    SeriesScope,
+    Appointment, AppointmentPatch, Appointments, Error, OverrideChange, Recurrence, Relation,
+    Restorable, RuleEnd, SeriesScope,
 };
 use fs_calendars_testdata::sample::at;
 
@@ -29,7 +29,7 @@ async fn delete_this_makes_an_excluded_override() {
         .await
         .unwrap();
     assert!(
-        r.restorable_until.is_some(),
+        matches!(r.restorable, Restorable::Until(_)),
         "a partial delete can be undone with restore"
     );
     let now = f.get(a.id).await.unwrap().unwrap();
@@ -54,7 +54,9 @@ async fn delete_this_and_following_cuts_the_series() {
     .await
     .unwrap();
     let now = f.get(a.id).await.unwrap().unwrap();
-    assert!(matches!(now.recurrence[0].end, RuleEnd::Until(_)));
+    assert!(
+        matches!(&now.recurrence[0], Recurrence::Rule(r) if matches!(r.end, RuleEnd::Until(_)))
+    );
     let w = window(&f, utc(2026, 11, 1, 0, 0), utc(2027, 6, 1, 0, 0)).await;
     let n = w.instances.iter().filter(|i| i.appointment == a.id).count();
     assert_eq!(
@@ -187,7 +189,7 @@ async fn this_and_following_splits_the_series() {
             .any(|r| r.relation == Relation::Next && r.uid == tail.uid)
     );
     // 20 occurrences in all; 7 lie before the 25th (Nov 2, 4, 9, 11, 16, 18, 23), so the tail keeps 13.
-    assert_eq!(tail.recurrence[0].end, RuleEnd::Count(13));
+    assert!(matches!(&tail.recurrence[0], Recurrence::Rule(r) if r.end == RuleEnd::Count(13)));
     let w = window(&f, utc(2026, 11, 1, 0, 0), utc(2027, 6, 1, 0, 0)).await;
     let tail_n = w
         .instances

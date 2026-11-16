@@ -9,7 +9,7 @@ use chrono::{Duration, NaiveDateTime};
 
 use crate::draft::{
     Appointment, AppointmentPatch, Damaged, Instance, LocalDateTime, Override, OverrideChange,
-    PersonRef, Result, Utc, When, Zone,
+    PersonRef, Recurrence, Result, Utc, When, Zone,
 };
 use crate::ids::actor;
 use crate::patch::apply;
@@ -136,18 +136,11 @@ pub fn in_window(
         return (found, damaged);
     };
     let limit = from_utc_ms(to) + Duration::days(2);
-    let mut all: Vec<NaiveDateTime> = Vec::new();
-    if a.recurrence.is_empty() {
-        all.push(start);
-    }
-    for rule in &a.recurrence {
-        all.extend(occurrences(rule, start, limit));
-    }
-    all.sort();
-    all.dedup();
+    let all = expand(&a.recurrence, start, limit);
     let excluded: HashSet<NaiveDateTime> = a
         .excluded_recurrence
         .iter()
+        .filter_map(Recurrence::rule)
         .flat_map(|r| occurrences(r, start, limit))
         .collect();
     let overrides: HashMap<NaiveDateTime, &Override> = a
@@ -192,4 +185,21 @@ pub fn in_window(
         }
     }
     (found, damaged)
+}
+
+/// All occurrences of a list of recurrences from `start` (always the first) up to `limit`, sorted and without
+/// doubles. An `Original` rule is not expanded (it shows the first occurrence only, ADR 0030).
+#[must_use]
+pub fn expand(
+    rules: &[Recurrence],
+    start: NaiveDateTime,
+    limit: NaiveDateTime,
+) -> Vec<NaiveDateTime> {
+    let mut all = vec![start];
+    for rule in rules.iter().filter_map(Recurrence::rule) {
+        all.extend(occurrences(rule, start, limit));
+    }
+    all.sort();
+    all.dedup();
+    all
 }

@@ -10,7 +10,7 @@ mod common;
 use common::{loaded, utc, window};
 use fs_calendars_testdata::draft::{
     Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, Appointments, Error,
-    HistoryKind, Revision, SeriesScope, Value, When,
+    HistoryKind, Recurrence, Restorable, Revision, SeriesScope, Trash, Value, When,
 };
 use fs_calendars_testdata::sample::{at, rule, timed};
 use fs_calendars_testdata::{FakeAppointments, ids};
@@ -73,7 +73,7 @@ async fn bad_input_writes_nothing() {
         zone_assumed: false,
     };
     assert!(
-        matches!(f.create(draft(&f, "x", bad_zone)).await, Err(Error::UnknownZone(z)) if z == "Mars/Olympus")
+        matches!(f.create(draft(&f, "x", bad_zone)).await, Err(Error::Invalid(p)) if p[0].field == "when.zone" && p[0].reason == "zone.bad")
     );
     assert!(
         matches!(f.create(draft(&f, "  ", timed(at(2026, 11, 17, 9, 0), "UTC", 60))).await, Err(Error::Invalid(p)) if p[0].field == "title")
@@ -92,7 +92,9 @@ async fn bad_input_writes_nothing() {
     d.calendar = ids::object_id(77);
     assert!(matches!(f.create(d).await, Err(Error::NotFound(_))));
     let mut hourly = draft(&f, "x", timed(at(2026, 11, 17, 9, 0), "UTC", 60));
-    hourly.rest.recurrence = Some(vec![rule(fs_calendars_testdata::draft::Frequency::Hourly)]);
+    hourly.rest.recurrence = Some(vec![Recurrence::Rule(rule(
+        fs_calendars_testdata::draft::Frequency::Hourly,
+    ))]);
     assert!(matches!(f.create(hourly).await, Err(Error::Invalid(_))));
     assert!(
         f.list(&AppointmentQuery::default(), None, 10)
@@ -190,8 +192,8 @@ async fn delete_goes_to_the_trash_and_restore_brings_it_back() {
         .await
         .unwrap();
     assert_eq!(
-        d.restorable_until,
-        Some(fs_calendars_testdata::draft::Utc::from_millis(
+        d.restorable,
+        Restorable::Until(fs_calendars_testdata::draft::Utc::from_millis(
             1_794_816_000_000 + 30 * 24 * 3600 * 1000
         ))
     );
@@ -204,18 +206,17 @@ async fn delete_goes_to_the_trash_and_restore_brings_it_back() {
             .all(|i| i.appointment != a.id)
     );
     let q = AppointmentQuery {
-        include_deleted: true,
+        trash: Trash::Include,
         text: Some("zahnarzt".to_owned()),
         ..AppointmentQuery::default()
     };
     let trashed = f.list(&q, None, 10).await.unwrap().items;
     assert_eq!(trashed.len(), 1);
-    assert_eq!(trashed[0].restorable_until, d.restorable_until);
-    assert!(trashed[0].restorable_until.is_some());
+    assert_eq!(trashed[0].trash, Some(d.restorable));
     assert!(f.restore(a.id, SeriesScope::Whole).await.is_ok());
     let living = f.list(&q, None, 10).await.unwrap().items;
     assert_eq!(living.len(), 1);
-    assert_eq!(living[0].restorable_until, None);
+    assert_eq!(living[0].trash, None);
     assert!(f.get(a.id).await.unwrap().is_some());
     assert!(
         matches!(
@@ -255,7 +256,7 @@ async fn paging_search_and_the_feed() {
         .await
         .unwrap();
     assert!(second.next.is_none());
-    assert_eq!(first.items.len() + second.items.len(), 30 + 15);
+    assert_eq!(first.items.len() + second.items.len(), 30 + 19);
     assert!(first.items.windows(2).all(|p| p[0].id != p[1].id));
     assert_eq!(
         f.search("raum 4", None, 10).await.unwrap().items.len(),
@@ -274,7 +275,7 @@ async fn paging_search_and_the_feed() {
     let ch = f.changes(start.as_ref(), 10).await.unwrap();
     assert_eq!(
         (ch.items.len(), ch.items[0].appointment, ch.items[0].kind),
-        (1, a.id, HistoryKind::Create)
+        (1, Some(a.id), HistoryKind::Create)
     );
     assert!(
         f.changes(ch.next.as_ref(), 10)

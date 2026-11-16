@@ -8,10 +8,10 @@ use chrono::{Duration, NaiveDateTime};
 use crate::check;
 use crate::draft::{
     Appointment, AppointmentPatch, Error, FieldChange, HistoryKind, LocalDateTime, ObjectId,
-    Override, OverrideChange, Problem, Related, Relation, Result, Revision, RuleEnd, SeriesScope,
-    Value,
+    Override, OverrideChange, Problem, Recurrence, Related, Relation, Result, Revision, RuleEnd,
+    SeriesScope, Value,
 };
-use crate::instances::{series_start, when_at};
+use crate::instances::{expand, series_start, when_at};
 use crate::patch::{apply, describe, merge};
 use crate::recur::occurrences;
 use crate::state::{Item, State};
@@ -37,10 +37,7 @@ pub fn occurrence(a: &Appointment, rid: LocalDateTime) -> Result<NaiveDateTime> 
     let (Some(r), Some(start)) = (r, start) else {
         return Err(invalid("scope.recurrence_id", "no such date or time"));
     };
-    if a.recurrence
-        .iter()
-        .any(|rule| occurrences(rule, start, r).contains(&r))
-    {
+    if expand(&a.recurrence, start, r).contains(&r) {
         Ok(r)
     } else {
         Err(invalid(
@@ -56,6 +53,7 @@ pub(crate) fn checked(
     expected: Option<Revision>,
 ) -> Result<Appointment> {
     let cur = state.live(id)?.appt.clone();
+    state.writable_calendar(cur.calendar)?;
     match expected {
         Some(e) if e != cur.revision => Err(Error::Changed {
             current: cur.revision,
@@ -80,6 +78,7 @@ pub(crate) fn commit(
         Item {
             appt: new.clone(),
             deleted: None,
+            via_calendar: false,
         },
     );
     new
@@ -89,7 +88,9 @@ pub(crate) fn commit(
 pub fn truncate(a: &mut Appointment, at: NaiveDateTime) {
     let until = RuleEnd::Until(local(at - Duration::seconds(1)));
     for r in &mut a.recurrence {
-        r.end = until;
+        if let Recurrence::Rule(rule) = r {
+            rule.end = until;
+        }
     }
     a.overrides
         .retain(|o| naive(o.recurrence_id).is_some_and(|n| n < at));
@@ -99,6 +100,31 @@ pub fn upsert(a: &mut Appointment, o: Override) {
     a.overrides.retain(|x| x.recurrence_id != o.recurrence_id);
     a.overrides.push(o);
     a.overrides.sort_by_key(|x| naive(x.recurrence_id));
+}
+
+/// A recurrence outside the subset (`Original`) is kept as it is; a new or changed one is `Unsupported` (ADR 0030).
+///
+/// # Errors
+/// `Unsupported { capability }` when the patch brings an `Original` the appointment does not have.
+pub fn no_new_original(
+    cur: &Appointment,
+    patch: &AppointmentPatch,
+    capability: &str,
+) -> Result<()> {
+    let known = |r: &Recurrence| cur.recurrence.contains(r) || cur.excluded_recurrence.contains(r);
+    let new = patch
+        .recurrence
+        .iter()
+        .chain(&patch.excluded_recurrence)
+        .flatten()
+        .any(|r| matches!(r, Recurrence::Original(_)) && !known(r));
+    if new {
+        return Err(Error::Unsupported {
+            capability: capability.to_owned(),
+            reason: "a recurrence rule outside the subset cannot be made or changed".to_owned(),
+        });
+    }
+    Ok(())
 }
 
 /// Change, invite or answer: the one write path. `expected = None` writes against the current revision.
@@ -119,6 +145,7 @@ pub fn write(
     changes.extend(extra);
     match scope {
         SeriesScope::Whole => {
+            no_new_original(&cur, patch, "event.update")?;
             let mut new = cur.clone();
             apply(&mut new, patch);
             check::appointment(&new, &state.customs)?;
@@ -128,6 +155,9 @@ pub fn write(
             Ok(commit(state, cur.revision, new, kind, changes))
         }
         SeriesScope::This { recurrence_id } => {
+            if patch.recurrence.is_some() || patch.excluded_recurrence.is_some() {
+                return Err(invalid("recurrence", "not allowed in an exception"));
+            }
             occurrence(&cur, recurrence_id)?;
             let existing = cur
                 .overrides
@@ -201,9 +231,11 @@ fn split(
     tail.overrides
         .retain(|o| naive(o.recurrence_id).is_some_and(|n| n >= at));
     for (t, r) in tail.recurrence.iter_mut().zip(&cur.recurrence) {
-        if let RuleEnd::Count(c) = t.end {
-            let before = occurrences(r, start, at - Duration::seconds(1)).len();
-            t.end = RuleEnd::Count(c.saturating_sub(u32::try_from(before).unwrap_or(u32::MAX)));
+        if let (Recurrence::Rule(t), Recurrence::Rule(r)) = (t, r) {
+            if let RuleEnd::Count(c) = t.end {
+                let before = occurrences(r, start, at - Duration::seconds(1)).len();
+                t.end = RuleEnd::Count(c.saturating_sub(u32::try_from(before).unwrap_or(u32::MAX)));
+            }
         }
     }
     tail.related.retain(|r| r.relation != Relation::First);
@@ -233,6 +265,7 @@ fn split(
         Item {
             appt: tail.clone(),
             deleted: None,
+            via_calendar: false,
         },
     );
     Ok(tail)

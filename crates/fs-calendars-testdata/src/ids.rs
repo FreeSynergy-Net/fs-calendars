@@ -26,6 +26,15 @@ pub fn person_iri(n: u64) -> Reference {
     crate::zone::reference(&format!("urn:uuid:00000000-0000-7000-8000-{n:012x}"))
 }
 
+/// The IRI of the calendar with this id (what `Origin.source` of subscribed appointments holds, never the feed address).
+#[must_use]
+pub fn calendar_iri(id: ObjectId) -> Reference {
+    crate::zone::reference(&format!(
+        "urn:uuid:00000000-0000-7000-a000-{:012x}",
+        object_number(id)
+    ))
+}
+
 /// A reference to the person with the number `n` (kind `Person`, no excerpt).
 #[must_use]
 pub fn person(n: u64) -> PersonRef {
