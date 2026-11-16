@@ -71,8 +71,6 @@ pub async fn put_exception(
     actor: &PersonRef,
     now: i64,
 ) -> Result<()> {
-    let at = naive(o.recurrence_id)
-        .ok_or_else(|| invalid("scope.recurrence_id", "no such date or time"))?;
     let existing = exception_id(c, master.id, o.recurrence_id).await?;
     if let (Some(e), OverrideChange::Excluded) = (existing, &o.change) {
         // A changed occurrence that is deleted keeps its row and its fields: `restore` gives the change back.
@@ -83,6 +81,39 @@ pub async fn put_exception(
         .await?;
         return Ok(());
     }
+    write_exception(c, master, o, existing, actor, now).await
+}
+
+/// Make the exception of an occurrence a plain `Excluded` in place: same row, same envelope, the fields of an earlier
+/// change are gone (ADR 0073 data minimisation; never `DELETE` + `INSERT`).
+///
+/// # Errors
+/// `Invalid` or the engine's error.
+pub async fn scrub_exception(
+    c: &Conn<'_>,
+    master: &Appointment,
+    rid: LocalDateTime,
+    actor: &PersonRef,
+    now: i64,
+) -> Result<()> {
+    let existing = exception_id(c, master.id, rid).await?;
+    let o = Override {
+        recurrence_id: rid,
+        change: OverrideChange::Excluded,
+    };
+    write_exception(c, master, &o, existing, actor, now).await
+}
+
+async fn write_exception(
+    c: &Conn<'_>,
+    master: &Appointment,
+    o: &Override,
+    existing: Option<ObjectId>,
+    actor: &PersonRef,
+    now: i64,
+) -> Result<()> {
+    let at = naive(o.recurrence_id)
+        .ok_or_else(|| invalid("scope.recurrence_id", "no such date or time"))?;
     let eid = match existing {
         Some(e) => e,
         None => new_id(now)?,

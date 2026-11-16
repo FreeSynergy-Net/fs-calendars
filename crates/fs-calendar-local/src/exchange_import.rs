@@ -93,6 +93,11 @@ impl LocalExchange {
                 }
                 Err(e) => return Err(e),
             };
+            if self.local.uid_exists(&read.uid).await? {
+                // Before the directory is asked: no proposal for an object that is not imported.
+                report.skipped.push(read.uid.clone());
+                continue;
+            }
             let mut losses = read.losses.clone();
             let people = self
                 .participants(&read.people, &read.uid, media.0 == ICS, &mut losses)

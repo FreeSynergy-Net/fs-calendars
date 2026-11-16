@@ -59,6 +59,21 @@ impl LocalAppointments {
         })
     }
 
+    /// Whether an appointment with this `uid` exists (a trashed one too: `uid` is unique).
+    ///
+    /// # Errors
+    /// The engine's error.
+    pub async fn uid_exists(&self, uid: &str) -> Result<bool> {
+        let c = self.store.read().await;
+        let rows = c
+            .query(
+                "SELECT 1 FROM calendar_appointment WHERE uid = ? AND master IS NULL",
+                vec![text(uid)],
+            )
+            .await?;
+        Ok(!rows.is_empty())
+    }
+
     /// The acting person.
     #[must_use]
     pub fn actor(&self) -> &PersonRef {

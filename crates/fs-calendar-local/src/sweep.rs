@@ -3,13 +3,11 @@
 //!
 //! Pattern: Transaction script (one pass over the expired cuts, in the caller's transaction).
 
-use fs_calendar_testdata::draft::{
-    LocalDateTime, ObjectId, Override, OverrideChange, PersonRef, Result,
-};
+use fs_calendar_testdata::draft::{LocalDateTime, ObjectId, PersonRef, Result};
 
 use crate::codec::{get_id, get_int, id_value, int};
 use crate::read::load;
-use crate::series::{put_exception, remove_exception};
+use crate::series::scrub_exception;
 use crate::store::Conn;
 
 /// What a run removed.
@@ -85,17 +83,6 @@ async fn scrub(
         return Ok(0);
     };
     let rid: LocalDateTime = crate::codec::int_to_local(at)?;
-    remove_exception(c, master, rid).await?;
-    put_exception(
-        c,
-        &m.appt,
-        &Override {
-            recurrence_id: rid,
-            change: OverrideChange::Excluded,
-        },
-        actor,
-        now,
-    )
-    .await?;
+    scrub_exception(c, &m.appt, rid, actor, now).await?;
     Ok(1)
 }

@@ -131,6 +131,7 @@ impl Exchange for LocalExchange {
         let mut report = ImportReport::default();
         match as_type.0.as_str() {
             ICS => {
+                report.lost.extend(tasks_in(&text));
                 for part in split_ics(&text, Component::Event) {
                     match parse_entries(&part.text, "Event") {
                         Ok((entries, _notes)) => events.extend(entries.into_iter().map(|e| {
@@ -156,6 +157,13 @@ impl Exchange for LocalExchange {
                     None => vec![up.value.clone()],
                 };
                 let single = list.len() == 1;
+                for e in &list {
+                    if e.get("@type").and_then(Value::as_str) == Some("Task") {
+                        report
+                            .lost
+                            .push(task_loss(e.get("uid").and_then(Value::as_str), "Task"));
+                    }
+                }
                 for e in list
                     .into_iter()
                     .filter(|e| e.get("@type").and_then(Value::as_str) == Some("Event"))
@@ -225,4 +233,29 @@ impl Exchange for LocalExchange {
             lost,
         })
     }
+}
+
+fn task_loss(uid: Option<&str>, kind: &str) -> fs_calendar_testdata::draft::Loss {
+    fs_calendar_testdata::draft::Loss {
+        uid: uid.map(str::to_owned),
+        field: kind.to_owned(),
+        reason: "a task belongs to fs-tasks: not imported here, not forwarded yet".into(),
+    }
+}
+
+/// The `VTODO` components of an iCalendar text (the event reader leaves them out): one loss each.
+fn tasks_in(text: &str) -> Vec<fs_calendar_testdata::draft::Loss> {
+    let (mut out, mut inside, mut uid) = (Vec::new(), false, None::<String>);
+    for line in fs_jscalendar::ical::unfolded_lines(text) {
+        match line.as_str() {
+            "BEGIN:VTODO" => (inside, uid) = (true, None),
+            "END:VTODO" => {
+                out.push(task_loss(uid.take().as_deref(), "VTODO"));
+                inside = false;
+            }
+            l if inside && l.starts_with("UID:") => uid = Some(l[4..].to_owned()),
+            _ => {}
+        }
+    }
+    out
 }

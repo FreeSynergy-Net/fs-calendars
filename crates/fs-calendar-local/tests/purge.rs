@@ -205,10 +205,16 @@ async fn the_period_run_removes_the_fields_of_a_deleted_changed_occurrence() {
             .unwrap();
     let d = f.p.delete(a.id, u.revision, this(9)).await.unwrap();
     assert_eq!(f.count("calendar_override_field").await, 1);
+    let ids_before = f.rows("SELECT id FROM objects ORDER BY id").await;
     f.set_now(d.restorable_until.unwrap().millis());
     let swept = f.p.sweep_expired().await.unwrap();
     assert_eq!((swept.cuts, swept.scrubbed), (1, 1));
     assert_eq!(f.count("calendar_override_field").await, 0);
+    assert_eq!(
+        f.rows("SELECT id FROM objects ORDER BY id").await,
+        ids_before,
+        "changed in place: no new envelope, no lost one"
+    );
     let rows = f
         .rows("SELECT title FROM calendar_appointment WHERE master IS NOT NULL")
         .await;

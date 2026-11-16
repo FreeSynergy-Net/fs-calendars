@@ -242,6 +242,27 @@ pub fn read_event(v: &Value, ctx: &ImportContext) -> Result<Read> {
         }
     }
     let people = people_of(v, &uid, &mut losses);
+    if v.get("sequence")
+        .and_then(Value::as_u64)
+        .is_some_and(|n| n > 0)
+    {
+        losses.push(Loss {
+            uid: Some(uid.clone()),
+            field: "sequence".into(),
+            reason:
+                "the sequence of the file is not taken over (counted anew); kept in the original"
+                    .into(),
+        });
+    }
+    if let Some(org) = text(v, "organizerCalendarAddress") {
+        if !people.iter().any(|p| p.address.as_deref() == Some(org)) {
+            losses.push(Loss {
+                uid: Some(uid.clone()),
+                field: "organizerCalendarAddress".into(),
+                reason: "the organizer is not a participant: kept only in the original".into(),
+            });
+        }
+    }
     let title = text(v, "title").unwrap_or_default().to_owned();
     Ok(Read {
         uid,
