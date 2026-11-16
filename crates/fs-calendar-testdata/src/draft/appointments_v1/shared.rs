@@ -1,5 +1,7 @@
 //! Gemeinsame Typen (Stand-in). EIGENTÜMER: fs-interfaces / fs-types (ADR 0085 "Folgen").
 //! Stufe 3 ersetzt GENAU DIESE DATEI durch `pub use` der echten Typen (siehe `mod.rs`, Sperrbereich).
+//!
+//! Pattern: Value Object (Stand-in der Basistypen; Eintritt nur über `parse`/Konstruktoren).
 
 /// Fehler beim Lesen eines Basistyps (Stand-in für `fs_types::TypeProblem`).
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -1,4 +1,6 @@
 //! Aufzählungen und Unterobjekte (je eine Untertabelle, PLAN.md Abschnitt 2).
+//!
+//! Pattern: Value Object (Unterobjekte und Aufzählungen, je eine Untertabelle).
 
 use super::*;
 

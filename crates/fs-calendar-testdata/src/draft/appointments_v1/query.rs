@@ -1,4 +1,6 @@
 //! Abfragen und Antworten, Protokoll.
+//!
+//! Pattern: Value Object (Abfrage-, Antwort- und Protokolltypen).
 
 use super::*;
 

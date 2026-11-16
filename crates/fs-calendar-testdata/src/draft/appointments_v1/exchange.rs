@@ -1,4 +1,6 @@
 //! Grenze (ADR 0085 Abschnitt 1, Strang D E15): Formate liefern Anbieter außerhalb des Fach-Traits.
+//!
+//! Pattern: Adapter (Formate und Personenverzeichnis an der Grenze, hinter Traits).
 
 use super::*;
 use async_trait::async_trait;

@@ -1,4 +1,6 @@
 //! Termin, Entwurf, Änderung, Ausnahme.
+//!
+//! Pattern: Value Object (Termin, Entwurf, Änderung als reine Daten).
 
 use super::*;
 

@@ -1,4 +1,6 @@
 //! Der Trait `Appointments` und seine Fähigkeitskennungen.
+//!
+//! Pattern: Repository (Trait) mit Null Object (nicht überschriebene Methoden sind `Unsupported`).
 
 use super::*;
 use async_trait::async_trait;

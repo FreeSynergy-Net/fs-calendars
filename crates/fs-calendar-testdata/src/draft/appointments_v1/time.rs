@@ -1,4 +1,6 @@
 //! Zeit und Herkunft eines Termins.
+//!
+//! Pattern: Value Object (Zeit und Herkunft eines Termins).
 
 use super::*;
 
