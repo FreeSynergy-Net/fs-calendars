@@ -16,6 +16,8 @@ pub enum Logical {
     /// Days since 1970-01-01.
     Date,
     Zone,
+    /// Bytes as they are: only `object_original.bytes` (ADR 0086 item 4).
+    Blob,
     /// UUID text of an object.
     Ref,
     /// Absolute IRI as written.
@@ -30,6 +32,7 @@ impl Logical {
         match self {
             Self::Int | Self::Bool | Self::Utc | Self::Local | Self::Date => "INTEGER",
             Self::Real => "REAL",
+            Self::Blob => "BLOB",
             _ => "TEXT",
         }
     }
@@ -46,6 +49,7 @@ impl Logical {
             Self::Local => "local",
             Self::Date => "date",
             Self::Zone => "zone",
+            Self::Blob => "blob",
             Self::Ref => "ref",
             Self::Iri => "iri",
             Self::Enum(_) => "enum",

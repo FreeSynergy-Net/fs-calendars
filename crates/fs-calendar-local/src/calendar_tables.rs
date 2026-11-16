@@ -11,7 +11,7 @@ use crate::spec::{
 };
 
 pub const PREFIX: &str = "calendar";
-pub const VERSION: i64 = 2;
+pub const VERSION: i64 = 3;
 pub const STATUS: &[&str] = &["confirmed", "tentative", "cancelled"];
 pub const FREE_BUSY: &[&str] = &["busy", "free"];
 pub const PRIVACY: &[&str] = &["public", "private", "secret"];
@@ -177,10 +177,10 @@ const fn value_table(name: &'static str) -> Table {
     }
 }
 
-pub use crate::series_tables::{CUT, CUT_RULE, OVERRIDE, RELATED, RULE, RULE_PART};
+pub use crate::series_tables::{CUT, CUT_RULE, OVERRIDE, RELATED, RULE, RULE_PART, UNREAD};
 
 /// All tables of the domain, parents first.
-pub const ALL: [Table; 12] = [
+pub const ALL: [Table; 13] = [
     COLLECTION,
     APPOINTMENT,
     PARTICIPANT,
@@ -193,4 +193,5 @@ pub const ALL: [Table; 12] = [
     RELATED,
     CUT,
     CUT_RULE,
+    UNREAD,
 ];

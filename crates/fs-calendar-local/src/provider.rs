@@ -35,6 +35,15 @@ const OFFERED: [&str; 7] = [
     "event.history",
 ];
 
+/// What an export reads of one object.
+pub struct ExportSource {
+    pub appointment: Appointment,
+    /// Parts kept as written: `(field, text)`.
+    pub unread: Vec<(String, String)>,
+    /// The received file of this object, when it is kept.
+    pub original: Option<(Vec<u8>, fs_calendar_testdata::draft::MediaType)>,
+}
+
 impl LocalAppointments {
     /// Open the store at `path` (`:memory:` is volatile) and register the `calendar_` domain.
     ///
@@ -98,6 +107,60 @@ impl LocalAppointments {
         let c = self.store.begin().await?;
         let r = crate::sweep::sweep_expired(&c, self.clock.now(), &self.actor).await;
         c.finish(r).await
+    }
+
+    /// Import one object (one `uid`) in one transaction: appointment, exceptions, origin and original (the border,
+    /// `Exchange`). Not part of the trait.
+    ///
+    /// # Errors
+    /// `Invalid` when the `uid` exists, `NotFound` for the calendar, or the engine's error; nothing is written then.
+    pub async fn import_event(
+        &self,
+        calendar: ObjectId,
+        read: &crate::jscal_in::Read,
+        participants: Vec<fs_calendar_testdata::draft::Participant>,
+        origin: &crate::origin::NewOrigin,
+    ) -> Result<crate::import_ops::Imported> {
+        let c = self.store.begin().await?;
+        let r = crate::import_ops::import_one(
+            &c,
+            &self.actor,
+            self.clock.now(),
+            calendar,
+            read,
+            participants,
+            origin,
+        )
+        .await;
+        c.finish(r).await
+    }
+
+    /// What an export needs of one object: the appointment, the parts kept as written and the received original.
+    ///
+    /// # Errors
+    /// `NotFound` for an unknown or trashed object.
+    pub async fn export_source(&self, id: ObjectId) -> Result<ExportSource> {
+        let c = self.store.read().await;
+        let l = load(
+            &c,
+            "t.id = ? AND t.master IS NULL AND o.deleted IS NULL",
+            vec![id_value(id)],
+        )
+        .await?
+        .ok_or(fs_calendar_testdata::draft::Error::NotFound(id))?;
+        let unread = crate::origin::read_unread(&c, id).await?;
+        let original = crate::origin::original_of(&c, id).await?;
+        Ok(ExportSource {
+            appointment: l.appt,
+            unread,
+            original,
+        })
+    }
+
+    /// The acting person.
+    #[must_use]
+    pub fn actor(&self) -> &PersonRef {
+        &self.actor
     }
 
     /// The store (the tests look at the rows).

@@ -1579,7 +1579,10 @@ dependencies = [
  "async-trait",
  "chrono",
  "fs-calendar-testdata",
+ "fs-jscalendar",
  "getrandom 0.3.4",
+ "serde_json",
+ "sha2",
  "tokio",
  "turso",
 ]

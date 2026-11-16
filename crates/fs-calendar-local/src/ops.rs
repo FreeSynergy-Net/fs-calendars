@@ -133,7 +133,7 @@ pub async fn create(
     c.finish(r).await
 }
 
-async fn create_in(
+pub async fn create_in(
     c: &Conn<'_>,
     actor: &PersonRef,
     now: i64,
@@ -195,6 +195,7 @@ pub async fn update(
     scope: SeriesScope,
 ) -> Result<Appointment> {
     let r = async {
+        crate::origin::refuse_rule_edit(&c, id, &p).await?;
         match scope {
             SeriesScope::This { recurrence_id } => {
                 return update_this(&c, actor, now, id, expected, &p, recurrence_id).await;

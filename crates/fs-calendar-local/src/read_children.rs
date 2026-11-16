@@ -134,5 +134,6 @@ pub async fn fill_series(c: &Conn<'_>, a: &mut Appointment) -> Result<()> {
     (a.recurrence, a.excluded_recurrence) = crate::rules::read_rules(c, a.id).await?;
     a.related = crate::rules::read_related(c, a.id).await?;
     a.overrides = crate::series::read_overrides(c, a.id).await?;
+    a.origin = crate::origin::read_origin(c, a.id).await?;
     Ok(())
 }

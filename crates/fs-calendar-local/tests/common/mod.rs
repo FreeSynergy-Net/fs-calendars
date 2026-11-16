@@ -1,6 +1,7 @@
 //! Helpers shared by the tests of `LocalAppointments`.
 #![allow(dead_code)]
 
+pub mod exchange;
 pub mod series;
 
 use std::sync::Arc;

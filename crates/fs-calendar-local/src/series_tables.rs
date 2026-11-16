@@ -144,3 +144,15 @@ pub const CUT_RULE: Table = Table {
     ],
     indexes: &[],
 };
+
+/// A part of an imported object that this program cannot interpret and keeps as it was written (`field` names it).
+pub const UNREAD: Table = Table {
+    name: "calendar_unread",
+    cols: &[
+        Col::req("appointment", Ref),
+        Col::req("field", Enum(&["rrule"])),
+        Col::req("text", Text),
+    ],
+    constraints: &["PRIMARY KEY (appointment, field)", RULE_FK],
+    indexes: &[],
+};

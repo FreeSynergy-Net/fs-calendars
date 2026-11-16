@@ -36,6 +36,7 @@ pub fn check_value(t: &Table, c: &Col, v: &Value) -> Result<()> {
         (Logical::Local, Value::Integer(s)) if DateTime::from_timestamp(*s, 0).is_some() => Ok(()),
         (Logical::Date, Value::Integer(d)) if crate::codec::int_to_date(*d).is_ok() => Ok(()),
         (Logical::Local | Logical::Date, _) => bad("not a real calendar value"),
+        (Logical::Blob, Value::Blob(_)) => Ok(()),
         (Logical::Zone, Value::Text(z)) => check_zone(&field, z),
         (Logical::Ref, Value::Text(r)) if parse_id(r).is_some() => Ok(()),
         (Logical::Ref, _) => bad("not an object id"),

@@ -1,0 +1,80 @@
+//! Where received and written files live (fs-files at the border): a small trait and a memory implementation.
+//!
+//! Pattern: Adapter port. A `FileRef` carries the checksum, so a read can be checked against what was promised.
+
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+use async_trait::async_trait;
+use fs_calendar_testdata::draft::{BasicValue, Error, FileRef, MediaType, Reference, Result};
+
+use crate::origin::sha256_hex;
+
+/// Read and write files by reference.
+#[async_trait]
+pub trait FileStore: Send + Sync {
+    /// The bytes of a file.
+    async fn read(&self, f: &FileRef) -> Result<Vec<u8>>;
+    /// Keep bytes; the reference carries their checksum.
+    async fn write(&self, bytes: Vec<u8>, media: &MediaType) -> Result<FileRef>;
+}
+
+/// Files in memory (tests, and the CLI before fs-files is wired in).
+#[derive(Default)]
+pub struct MemoryFiles(Mutex<HashMap<String, Vec<u8>>>);
+
+impl MemoryFiles {
+    /// Put bytes in and get the reference (`urn:sha256:<hex>`).
+    ///
+    /// # Panics
+    /// Never in practice: the IRI is built from hex.
+    pub fn put(&self, bytes: &[u8], media: &MediaType) -> FileRef {
+        let hex = sha256_hex(bytes);
+        let mut sha = [0_u8; 32];
+        for (i, b) in sha.iter_mut().enumerate() {
+            *b = u8::from_str_radix(&hex[2 * i..2 * i + 2], 16).unwrap_or(0);
+        }
+        let iri = Reference::parse(&format!("urn:sha256:{hex}"))
+            .unwrap_or_else(|_| unreachable!("a urn built from hex"));
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(iri.canonical(), bytes.to_vec());
+        FileRef {
+            iri,
+            sha256: sha,
+            media_type: media.clone(),
+        }
+    }
+}
+
+#[async_trait]
+impl FileStore for MemoryFiles {
+    async fn read(&self, f: &FileRef) -> Result<Vec<u8>> {
+        let bytes = self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&f.iri.canonical())
+            .cloned();
+        let bytes = bytes
+            .ok_or_else(|| Error::Unavailable(format!("no such file {}", f.iri.canonical())))?;
+        if sha256_hex(&bytes).as_bytes()
+            != f.sha256
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+                .as_bytes()
+        {
+            return Err(crate::codec::invalid(
+                "source",
+                "the checksum of the file differs from its reference",
+            ));
+        }
+        Ok(bytes)
+    }
+
+    async fn write(&self, bytes: Vec<u8>, media: &MediaType) -> Result<FileRef> {
+        Ok(self.put(&bytes, media))
+    }
+}
