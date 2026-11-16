@@ -75,6 +75,9 @@ impl Appointments for Wrap {
         r
     }
     async fn restore_calendar(&self, id: ObjectId) -> Result<CalendarInfo> {
+        if crate::tamper::held_not_restorable(self.1, &self.0, id).await {
+            return Err(fs_calendars_testdata::draft::Error::NotFound(id));
+        }
         let r = self.0.restore_calendar(id).await;
         crate::tamper::restore_calendar(self.1, &self.0, r).await
     }

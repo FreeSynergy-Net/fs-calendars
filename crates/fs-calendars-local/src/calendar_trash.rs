@@ -14,6 +14,7 @@ use crate::codec::{get_int, id_value, invalid};
 use crate::envelope::{log, state, trash, untrash};
 use crate::restorable::{is_kept, restorable};
 use crate::store::Conn;
+use crate::sweep::{Guarded, guard, unguard};
 
 /// The living appointments (masters) of a calendar with their revisions.
 async fn living(c: &Conn<'_>, cal: ObjectId) -> Result<Vec<(ObjectId, Revision)>> {
@@ -104,6 +105,14 @@ async fn restore_in(
         .iter()
         .map(|r| crate::codec::get_id(r, 0))
         .collect::<Result<_>>()?;
+    // Shown as `Held`, it can be restored: the layer's `untrash` looks at the hold of each object, but only the kept
+    // one has it, so the others get a retention for the moment (the same transaction, taken off again at once).
+    let mut guarded = Guarded::new();
+    if is_kept(c, &kept_by(c, id).await?, now).await? {
+        let mut all = with.clone();
+        all.push(id);
+        guarded = guard(c, &all, Some(now.saturating_add(1)), now).await?;
+    }
     untrash(c, id, now).await?;
     for a in with {
         untrash(c, a, now).await?;
@@ -114,6 +123,7 @@ async fn restore_in(
         .await?;
         log(c, a, HistoryKind::Undo, actor, now, &[]).await?;
     }
+    unguard(c, guarded).await?;
     log(c, id, HistoryKind::Undo, actor, now, &[]).await?;
     one(c, id, now)
         .await?

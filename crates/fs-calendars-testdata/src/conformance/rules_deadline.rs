@@ -66,9 +66,18 @@ pub(super) async fn kept_calendar(cx: &mut Cx<'_>) {
     }
 }
 
-/// A kept calendar keeps what went to the trash with it: its appointments stay (and come back with it) while the
-/// retention lasts. (Restoring after the period is not asserted: the layer's `untrash` refuses it, see the report.)
+/// A kept calendar keeps what went to the trash with it: its appointments stay while the retention lasts, and what the
+/// trait shows as `Held` can be restored with all of them (also when only one appointment is kept).
 pub(super) async fn kept_calendar_keeps_appointments(cx: &mut Cx<'_>) {
+    for (name, on_calendar) in [
+        ("deadline-held-calendar", true),
+        ("deadline-held-appointment", false),
+    ] {
+        one_held(cx, name, on_calendar).await;
+    }
+}
+
+async fn one_held(cx: &mut Cx<'_>, name: &str, on_calendar: bool) {
     let dir = cx.dir;
     let Some(now) = cx.fx.now() else {
         return;
@@ -76,18 +85,19 @@ pub(super) async fn kept_calendar_keeps_appointments(cx: &mut Cx<'_>) {
     if !cx.fx.set_trash_period(Some(30 * DAY)).await {
         return;
     }
-    let Some(k) = cx.calendar("deadline-held-calendar").await else {
+    let Some(k) = cx.calendar(name).await else {
         return;
     };
-    let (Some(_), Some(_)) = (
+    let (Some(one), Some(_)) = (
         cx.appointment(k.id, "one", 6).await,
         cx.appointment(k.id, "two", 7).await,
     ) else {
         return;
     };
     let end = Utc::from_millis(now.millis() + 60 * DAY);
-    if !cx.fx.hold(k.id, Some(end)).await {
-        cx.skip("deadline: the fixture cannot keep a calendar");
+    let target = if on_calendar { k.id } else { one.id };
+    if !cx.fx.hold(target, Some(end)).await {
+        cx.skip("deadline: the fixture cannot keep an object");
         return;
     }
     if dir.delete_calendar(k.id, k.revision).await.is_err() {
@@ -106,5 +116,14 @@ pub(super) async fn kept_calendar_keeps_appointments(cx: &mut Cx<'_>) {
     cx.ensure(
         cx.all(&[k.id], Trash::Only).await.len() == 2,
         "deadline: a kept calendar keeps its appointments (both are still in the trash)",
+    );
+    let back = dir.restore_calendar(k.id).await;
+    cx.ensure(
+        back.as_ref().is_ok_and(|c| c.trash.is_none()),
+        "deadline: a calendar shown as Held can be restored",
+    );
+    cx.ensure(
+        cx.all(&[k.id], Trash::Exclude).await.len() == 2,
+        "deadline: a restored kept calendar has all its appointments back",
     );
 }

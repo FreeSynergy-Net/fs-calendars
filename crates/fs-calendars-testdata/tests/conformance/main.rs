@@ -205,3 +205,11 @@ async fn a_kept_calendar_that_loses_its_appointments_fails() {
     )
     .await;
 }
+#[tokio::test]
+async fn a_held_calendar_that_cannot_be_restored_fails() {
+    notices(
+        Mutant::HeldCalendarNotRestorable,
+        "a calendar shown as Held can be restored",
+    )
+    .await;
+}

@@ -53,6 +53,8 @@ pub enum Mutant {
     DeadlineIgnoresHold,
     /// A kept calendar loses its trashed appointments (the period takes them although the calendar is kept).
     HeldCalendarLosesAppointments,
+    /// A calendar shown as `Held` cannot be restored (`NotFound`), as the local provider did before.
+    HeldCalendarNotRestorable,
     /// A recurrence given as `Original` is accepted at `create`.
     OriginalAccepted,
 }

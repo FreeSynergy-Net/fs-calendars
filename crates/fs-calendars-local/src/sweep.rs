@@ -95,7 +95,7 @@ async fn delete_due_calendars(c: &Conn<'_>, now: i64) -> Result<usize> {
 }
 
 /// What a temporary retention replaced: the object and its own retention before (`None` = none).
-type Guarded = Vec<(ObjectId, Option<Option<i64>>)>;
+pub(crate) type Guarded = Vec<(ObjectId, Option<Option<i64>>)>;
 
 /// Trashed calendars that something keeps (an appointment of them, or the calendar itself): they and their trashed
 /// appointments get the latest end of those retentions (`None` = without end) until the run is done.
@@ -121,20 +121,32 @@ async fn guard_kept(c: &Conn<'_>, now: i64) -> Result<Guarded> {
             }
         }
         let Some(until) = latest else { continue };
-        for id in ids {
-            let before = hold::held_until(c.inner(), id).await.map_err(adapt)?;
-            if hold::is_held(c.inner(), id, now).await.map_err(adapt)? {
-                continue;
-            }
-            hold::hold(c.inner(), id, until).await.map_err(adapt)?;
-            done.push((id, before));
+        done.extend(guard(c, &ids, until, now).await?);
+    }
+    Ok(done)
+}
+
+/// A temporary retention (to `until`) on each of these that no retention keeps at `now`; what to put back is returned.
+pub(crate) async fn guard(
+    c: &Conn<'_>,
+    ids: &[ObjectId],
+    until: Option<i64>,
+    now: i64,
+) -> Result<Guarded> {
+    let mut done = Guarded::new();
+    for id in ids {
+        let before = hold::held_until(c.inner(), *id).await.map_err(adapt)?;
+        if hold::is_held(c.inner(), *id, now).await.map_err(adapt)? {
+            continue;
         }
+        hold::hold(c.inner(), *id, until).await.map_err(adapt)?;
+        done.push((*id, before));
     }
     Ok(done)
 }
 
 /// Put the retentions back as they were before the run.
-async fn unguard(c: &Conn<'_>, guarded: Guarded) -> Result<()> {
+pub(crate) async fn unguard(c: &Conn<'_>, guarded: Guarded) -> Result<()> {
     for (id, before) in guarded {
         match before {
             Some(until) => hold::hold(c.inner(), id, until).await,

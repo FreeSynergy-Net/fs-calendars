@@ -64,6 +64,24 @@ pub fn feed(
         .then(|| reference("https://kalender.example.org/safe.ics"))
 }
 
+/// The mutant `HeldCalendarNotRestorable`: a calendar that is shown as `Held` answers `NotFound`.
+pub async fn held_not_restorable(
+    m: Mutant,
+    fake: &FakeAppointments,
+    id: fs_calendars_testdata::draft::ObjectId,
+) -> bool {
+    is(m, Mutant::HeldCalendarNotRestorable)
+        && fake.calendars(Trash::Only).await.is_ok_and(|l| {
+            l.iter().any(|c| {
+                c.id == id
+                    && matches!(
+                        c.trash,
+                        Some(fs_calendars_testdata::draft::Restorable::Held(_))
+                    )
+            })
+        })
+}
+
 pub async fn restore_calendar(
     m: Mutant,
     fake: &FakeAppointments,
