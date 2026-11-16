@@ -11,7 +11,7 @@ publish = false
 # The locked trait (folder hash 2b7fc98b..., byte-equal copy under `draft/appointments_v1`) and the zone helpers of the pilot.
 fs-calendar-testdata = { path = "../fs-calendar-testdata" }
 # The raised v5 layer (store, ids, envelope, log, original, purge). PROVISIONAL path dependency on the worktree of
-# unreviewed/v5-speicher (head f7b4cca): BLOCKER for main, switch to a git pin (tag) once fs-objects is merged and tagged.
+# unreviewed/v5-speicher (head a184579): BLOCKER for main, switch to a git pin (tag) once fs-objects is merged and tagged.
 fs-objects = { path = "/srv/FreeSynergy/.scratch/api-runner/wt/v5-hebe/crates/fs-objects", features = ["v5"] }
 # The shared types the layer speaks (same tag as fs-calendar-core).
 fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.22" }
