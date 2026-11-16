@@ -1,10 +1,10 @@
-//! Zeit und Herkunft eines Termins.
+//! Zeit und Herkunft eines Termins (Herkunft aus fs-jscalendar).
 //!
 //! Pattern: Value Object (Zeit und Herkunft eines Termins).
 
-use super::*;
+use super::{Date, LocalDateTime, Zone};
 
-/// Länge nach JSCalendar `Duration`: Tage sind nominal (ein "Tag" über die Zeitumstellung bleibt ein Tag).
+/// Länge nach `JSCalendar` `Duration`: Tage sind nominal (ein "Tag" über die Zeitumstellung bleibt ein Tag).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Span { pub days: u32, pub seconds: u32 }
 
@@ -22,32 +22,8 @@ pub enum When {
     AllDay { first: Date, days: u32 },
 }
 
-/// Herkunft eines importierten Objekts (fs-objects `object_origin`), nur lesend. "Unverändert seit Import"
-/// wird berechnet: `revision == rev_at_import`. Der Dateiname zählt nie (ADR 0085 Abschnitt 1).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Origin {
-    pub channel: OriginChannel,
-    /// Konten: IRI der Sammlung; Dateien: `urn:sha256:<hex>` der Datei.
-    pub source: Reference,
-    pub media_type: MediaType,
-    pub foreign_uid: String,
-    pub foreign_recurrence_id: Option<LocalDateTime>,
-    pub foreign_etag: Option<String>,
-    pub prod_id: Option<String>,
-    pub imported: Utc,
-    /// Name und Version des Importers.
-    pub importer: String,
-    pub rev_at_import: Revision,
-    /// Das Original (Ort und Prüfsumme), wenn aufbewahrt; Grundlage für "Byte für Byte" im Rundlauf
-    /// (ADR 0085 Abschnitt 1, ADR 0086 Punkt 4).
-    pub original: Option<FileRef>,
-}
-/// Kanal, über den ein Objekt hereinkam.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum OriginChannel {
-    File, CalDav, Google, Outlook, Itip, Hub,
-    /// Abo per URL (`webcal:`/`https:`-Feed): `Origin.source` ist die Feed-IRI, nicht der Dateihash, damit
-    /// wiederholte Abrufe dieselbe Quelle haben (Dubletten, Rundlauf). JMAP-Kalender (RFC 8620) gibt es
-    /// bewusst nicht in v1.
-    Subscription,
-}
+// Herkunft eines importierten Objekts (fs-objects `object_origin`, nur lesend) und ihr Kanal kommen aus fs-jscalendar
+// (Typ-Tausch; formgleich mit dem früheren Stand-in, auch für fs-tasks). "Unverändert seit Import" wird berechnet:
+// `revision == rev_at_import`; der Dateiname zählt nie (ADR 0085 Abschnitt 1). Kanal `Subscription`: `source` ist die
+// Feed-IRI des Abo-Kalenders (`CalendarSource::Subscribed`), nicht der Dateihash. JMAP gibt es bewusst nicht in v1.
+pub use fs_jscalendar::origin::{Origin, OriginChannel};

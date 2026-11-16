@@ -1,13 +1,13 @@
 //! Grenze (ADR 0085 Abschnitt 1, Strang D E15): Formate liefern Anbieter außerhalb des Fach-Traits.
 //!
-//! Pattern: Adapter (Formate und Personenverzeichnis an der Grenze, hinter Traits).
+//! Pattern: Adapter (Formate und Personenverzeichnis an der Grenze, hinter Traits); jede Methode ist Pflicht.
 
-use super::*;
+use super::{FileRef, MediaType, ObjectId, PersonRef, Problem, Reference, Result, Zone};
 use async_trait::async_trait;
-
 
 /// Fähigkeit eines Formats je Richtung.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Level { Full, Partial { missing: Vec<String> }, No }
 /// Was ein Format-Anbieter kann.
 #[derive(Clone, Debug)]
@@ -46,23 +46,22 @@ pub enum ZoneSource { PersonSetting, Device, LastKnownDevice, UtcFallback }
 
 /// Grenz-Adapter eines Formats (`text/calendar`, `application/jscalendar+json`, später iTIP/iMIP).
 /// Liest Fremdformat, normalisiert (Zeiten, Personen über [`PersonDirectory`]) und schreibt über
-/// [`Appointments`]; Export ist ein eigener Befehl, nie Speichern (ADR 0046).
+/// [`super::Appointments`]; Export ist ein eigener Befehl, nie Speichern (ADR 0046). Ein Anbieter ohne eine Richtung
+/// sagt es in `formats` (`Level::No`) und antwortet mit [`super::not_possible`].
 #[async_trait]
 pub trait Exchange: Send + Sync {
+    /// Was der Anbieter je Medientyp kann.
     fn formats(&self) -> Vec<FormatSupport>;
-    /// `exchange.import`
-    async fn import(&self, _source: FileRef, _as_type: &MediaType, _ctx: &ImportContext) -> Result<ImportReport> {
-        not_possible("exchange.import")
-    }
+    /// `exchange.import`; eine unbekannte oder eigene Zone wird ersetzt (`zone_assumed`, `Loss`), nie geraten.
+    async fn import(&self, source: FileRef, as_type: &MediaType, ctx: &ImportContext) -> Result<ImportReport>;
     /// `exchange.export`: Ziel = Quelle und unverändert = Original Byte für Byte; Ziel = Quelle, nur
     /// `zone_assumed`-Zeit unangetastet = wieder schwebend; sonst mit Zone (Rundlauf-Regel ADR 0085).
-    async fn export(&self, _ids: &[ObjectId], _to: &ExportTarget) -> Result<ExportReport> {
-        not_possible("exchange.export")
-    }
+    async fn export(&self, ids: &[ObjectId], to: &ExportTarget) -> Result<ExportReport>;
 }
 
 /// VERBRAUCHT, nicht unser Thema: Personen-Verweis (ADR 0085 Abschnitt 3, Eigentümer fs-people /
-/// fs-components-Baustein). Stand-in der Form, die fs-calendar braucht.
+/// fs-components-Baustein). Die Form, die fs-calendars braucht; erfüllt von fs-people (`person_directory_v1`) über einen
+/// Adapter im Programm.
 #[async_trait]
 pub trait PersonDirectory: Send + Sync {
     /// Person zu einer Adresse (`mailto:…`), wenn bekannt.

@@ -817,6 +817,8 @@ dependencies = [
  "async-trait",
  "chrono",
  "chrono-tz",
+ "fs-jscalendar 0.0.2",
+ "fs-types",
  "tokio",
 ]
 

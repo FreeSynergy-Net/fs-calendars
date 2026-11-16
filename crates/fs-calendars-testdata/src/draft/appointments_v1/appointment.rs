@@ -2,15 +2,12 @@
 //!
 //! Pattern: Value Object (Termin, Entwurf, Änderung als reine Daten).
 
-use super::*;
+use super::{
+    Alert, Channel, FreeBusy, Link, LocalDateTime, Localization, Location, ObjectId, Origin, Participant, Privacy,
+    RecurrenceRule, Related, Revision, Status, TextType, Utc, VirtualLocation, When,
+};
 
-
-/// Ein Kalender (Sammlung von Terminen). Sichtbarkeit und Farbe in der Seitenleiste sind Einstellung der
-/// Person, nicht Daten; `color` hier ist die Vorgabe des Kalenders.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CalendarInfo { pub id: ObjectId, pub name: String, pub color: Option<String>, pub default_zone: Option<Zone>, pub owner: PersonRef, pub revision: Revision }
-
-/// Der Termin (JSCalendar `Event`), vollständig typisiert.
+/// Der Termin (`JSCalendar` `Event`), vollständig typisiert.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Appointment {
     pub id: ObjectId,
@@ -62,7 +59,7 @@ pub struct AppointmentDraft {
 }
 
 /// Änderung: `Some` = Feld wird gesetzt (Listen ganz ersetzt), `None` = bleibt. Dieselbe Form beschreibt eine
-/// Ausnahme einer Serie (JSCalendar `PatchObject`, typisiert).
+/// Ausnahme einer Serie (`JSCalendar` `PatchObject`, typisiert).
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct AppointmentPatch {
     pub title: Option<String>,
