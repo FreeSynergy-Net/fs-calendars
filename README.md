@@ -39,9 +39,9 @@ Calendar sits in the groupware suite next to people, wiki, maps and messenger, a
 
 ## For developers
 
-- One program, one command (ADR 0063): `fs-calendar` opens the window, `fs-calendar serve` serves the contract over a Unix socket, `fs-calendar list|show|add|delete|export|import` is the command line. Build without the window: `--no-default-features`.
-- Workspace crates: `fs-calendar` (the binary), `fs-calendar-core`, `fs-calendar-server`, `fs-calendar-cli` and `fs-calendar-app` (libraries behind the subcommands), `fs-calendar-tasks`.
+- One program, one command (ADR 0063): `fs-calendars` opens the window, `fs-calendars serve` serves the contract over a Unix socket, `fs-calendars list|show|add|delete|export|import` is the command line. Build without the window: `--no-default-features`.
+- Workspace crates: `fs-calendars` (the binary), `fs-calendars-core`, `fs-calendars-server`, `fs-calendars-cli` and `fs-calendars-app` (libraries behind the subcommands), `fs-calendars-tasks`.
 - The contract is `events.capnp` in [fs-interfaces](https://github.com/FreeSynergy/fs-interfaces) (draft). Calendar owns it. Shared JSCalendar parts: [fs-jscalendar](https://github.com/FreeSynergy/fs-jscalendar).
-- Build and test: `cargo build --workspace` and `cargo test --workspace`. Try the core: `cargo run -p fs-calendar-core --example demo`.
+- Build and test: `cargo build --workspace` and `cargo test --workspace`. Try the core: `cargo run -p fs-calendars-core --example demo`.
 - Design and the full state table: [DESIGN.md](DESIGN.md).
 - Licence: MIT OR Apache-2.0.

@@ -1502,26 +1502,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar"
+name = "fs-calendars"
 version = "0.0.4"
 dependencies = [
- "fs-calendar-app",
- "fs-calendar-cli",
- "fs-calendar-server",
+ "fs-calendars-app",
+ "fs-calendars-cli",
+ "fs-calendars-server",
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
  "tempfile",
  "tokio",
 ]
 
 [[package]]
-name = "fs-calendar-app"
+name = "fs-calendars-app"
 version = "0.0.4"
 dependencies = [
  "async-trait",
  "chrono",
  "fs-admin-frontend",
- "fs-calendar-core",
- "fs-calendar-tasks",
+ "fs-calendars-core",
+ "fs-calendars-tasks",
  "fs-components-app",
  "fs-components-calendar-grid",
  "fs-components-fields",
@@ -1538,12 +1538,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar-cli"
+name = "fs-calendars-cli"
 version = "0.0.4"
 dependencies = [
  "capnp",
- "fs-calendar-core",
- "fs-calendar-server",
+ "fs-calendars-core",
+ "fs-calendars-server",
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
  "fs-objects",
  "serde_json",
@@ -1552,7 +1552,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar-core"
+name = "fs-calendars-core"
 version = "0.0.4"
 dependencies = [
  "async-trait",
@@ -1573,14 +1573,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar-server"
+name = "fs-calendars-server"
 version = "0.0.4"
 dependencies = [
  "async-trait",
  "capnp",
  "capnp-rpc",
  "chrono",
- "fs-calendar-core",
+ "fs-calendars-core",
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
  "fs-objects",
  "fs-types 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
@@ -1591,13 +1591,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar-tasks"
+name = "fs-calendars-tasks"
 version = "0.0.4"
 dependencies = [
  "async-trait",
  "capnp",
  "chrono",
- "fs-calendar-core",
+ "fs-calendars-core",
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.1)",
  "fs-objects",
  "fs-tasks-core",
@@ -1608,7 +1608,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-calendar-testdata"
+name = "fs-calendars-testdata"
 version = "0.0.4"
 dependencies = [
  "async-trait",

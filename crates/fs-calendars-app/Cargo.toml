@@ -1,0 +1,35 @@
+[package]
+name = "fs-calendars-app"
+description = "The calendar program of FreeSynergy: the generated admin window over the Event description (ADR 0066), in the window shell (ADR 0065)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+fs-calendars-core = { path = "../fs-calendars-core" }
+# The task program behind the calendar's two small traits; `local`: the task store is in this process.
+fs-calendars-tasks = { path = "../fs-calendars-tasks", features = ["local"] }
+fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
+# Tasks belong to fs-tasks (ADR 0050); shown through the TaskItems interface. Tag-pinned on purpose.
+fs-tasks-core = { git = "https://github.com/FreeSynergy/fs-tasks", tag = "v0.0.1" }
+fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.11" }
+# TEMPORARY (DESIGN.md, "Temporary duplication"): the types the shipped admin frontend takes; see src/frontend_types.rs.
+fs-types-frontend = { package = "fs-types", git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.2" }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.11", features = ["rpc"] }
+# One commit of branch thread-a-admin-frontend, untagged (DESIGN.md, "Pins"); all fs-components crates from the same commit.
+fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", rev = "9950b51" }
+fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", rev = "9950b51" }
+fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", rev = "9950b51" }
+fs-components-widgets = { git = "https://github.com/FreeSynergy/fs-components", rev = "9950b51" }
+fs-components-calendar-grid = { git = "https://github.com/FreeSynergy/fs-components", rev = "9950b51" }
+fs-components-styles = { git = "https://github.com/FreeSynergy/fs-components", rev = "9950b51" }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
+
+[dev-dependencies]
+tempfile = "3"
+async-trait = "0.1"
+tokio = { version = "1", features = ["full"] }

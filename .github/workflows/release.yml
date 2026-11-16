@@ -10,9 +10,9 @@ jobs:
   release:
     uses: FreeSynergy/fs-release/.github/workflows/release.yml@main
     with:
-      binaries: fs-calendar
-      cargo-package: fs-calendar
-      name: fs-calendar
+      binaries: fs-calendars
+      cargo-package: fs-calendars
+      name: fs-calendars
       kind: app
       app-id: net.freesynergy.Calendar
       macos: false

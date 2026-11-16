@@ -1,0 +1,28 @@
+[package]
+name = "fs-calendars-server"
+description = "Cap'n Proto server of FreeSynergy calendar: the contract events.capnp over a Unix socket, in front of any Calendar provider"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "fs_calendars_server"
+
+[dependencies]
+fs-calendars-core = { path = "../fs-calendars-core", features = ["contract"] }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.11", features = ["rpc"] }
+fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
+fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.11", features = ["rpc"] }
+capnp = "0.27"
+capnp-rpc = "0.27"
+serde_json = "1"
+tokio = { version = "1", features = ["sync"] }
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+
+[dev-dependencies]
+async-trait = "0.1"
+tempfile = "3"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+uuid = "1"
+tokio = { version = "1", features = ["full"] }
