@@ -4,6 +4,12 @@
 
 use crate::draft::{Appointment, AppointmentPatch, FieldChange, Value, When};
 
+/// A set: duplicates fall together, the first of each stays (keywords and categories are sets, plan section 11).
+fn set(v: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    v.into_iter().filter(|x| seen.insert(x.clone())).collect()
+}
+
 /// Set the fields the patch names; listed fields are replaced as a whole.
 pub fn apply(appt: &mut Appointment, p: &AppointmentPatch) {
     let p = p.clone();
@@ -36,10 +42,10 @@ pub fn apply(appt: &mut Appointment, p: &AppointmentPatch) {
         appt.color = v;
     }
     if let Some(v) = p.keywords {
-        appt.keywords = v;
+        appt.keywords = set(v);
     }
     if let Some(v) = p.categories {
-        appt.categories = v;
+        appt.categories = set(v);
     }
     if let Some(v) = p.locations {
         appt.locations = v;

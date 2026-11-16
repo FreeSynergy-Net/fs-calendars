@@ -180,3 +180,18 @@ async fn capabilities_say_what_this_slice_offers() {
     );
     let _ = AppointmentQuery::default();
 }
+
+#[tokio::test]
+async fn keywords_and_categories_are_sets_here_too() {
+    let f = fx().await;
+    let mut d = f.draft("Menge", timed(at(2026, 12, 1, 9, 0), "Europe/Berlin", 30));
+    d.rest.keywords = Some(vec!["b".into(), "a".into(), "b".into()]);
+    let a = f.p.create(d).await.unwrap();
+    let mut k = a.keywords;
+    k.sort();
+    assert_eq!(
+        k,
+        ["a", "b"],
+        "duplicates fall together (as a set; the order is not a contract)"
+    );
+}

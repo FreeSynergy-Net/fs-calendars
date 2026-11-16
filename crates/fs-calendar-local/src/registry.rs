@@ -54,7 +54,7 @@ pub async fn bootstrap(c: &Conn<'_>, now: i64) -> Result<()> {
     let mut own: Vec<Table> = OBJECT_TABLES.to_vec();
     own.extend([FS_DOMAIN, FS_COLUMN]);
     register(c, OWN, 1, "tables of the store itself", &own, now).await?;
-    let id = crate::codec::id_text(crate::clock::new_id(now));
+    let id = crate::codec::id_text(crate::clock::new_id(now)?);
     c.exec(
         "INSERT INTO meta (key, value) VALUES ('store_id', ?) ON CONFLICT (key) DO NOTHING",
         vec![text(&id)],

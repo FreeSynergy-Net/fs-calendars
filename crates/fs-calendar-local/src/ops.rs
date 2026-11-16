@@ -102,7 +102,7 @@ async fn create_calendar_in(
                 .to_owned(),
         });
     }
-    let id = new_id(now);
+    let id = new_id(now)?;
     insert(c, id, "Calendar", name, owner, now).await?;
     write_collection(c, id, name, color, zone.as_ref(), owner).await?;
     let ch = [FieldChange {
@@ -139,7 +139,7 @@ async fn create_in(
     now: i64,
     d: AppointmentDraft,
 ) -> Result<Appointment> {
-    let id = new_id(now);
+    let id = new_id(now)?;
     let uid = d
         .uid
         .clone()

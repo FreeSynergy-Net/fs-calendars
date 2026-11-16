@@ -4,46 +4,10 @@
 
 mod common;
 
-use std::time::Duration;
-
 use common::{fx, ms, utc};
 use fs_calendar_testdata::draft::{AppointmentQuery, Appointments, Error, Span, When};
 use fs_calendar_testdata::sample::at;
 use fs_calendar_testdata::zone::{custom, iana};
-
-#[tokio::test]
-async fn a_cancelled_future_leaves_no_open_transaction_behind() {
-    let f = fx().await;
-    let id = "01927f00-0000-7000-8000-0000000000ee";
-    let r = tokio::time::timeout(Duration::from_millis(50), async {
-        let c = f.p.store().begin().await.unwrap();
-        c.exec(
-            &format!("INSERT INTO purged_objects (object_id) VALUES ('{id}')"),
-            Vec::new(),
-        )
-        .await
-        .unwrap();
-        tokio::time::sleep(Duration::from_secs(30)).await;
-        c.finish(Ok(())).await
-    })
-    .await;
-    assert!(r.is_err(), "the future was cancelled");
-    assert_eq!(
-        f.count("purged_objects").await,
-        0,
-        "a read after the cancel sees no half write"
-    );
-    let a = f.make_berlin("danach", 2, 9).await;
-    assert_eq!(f.count("purged_objects").await, 0);
-    assert_eq!(
-        f.p.get(a.id).await.unwrap().unwrap().title,
-        "danach",
-        "the next write works"
-    );
-    let dropped = f.p.store().begin().await.unwrap();
-    drop(dropped);
-    f.make_berlin("und noch eins", 3, 9).await;
-}
 
 #[tokio::test]
 async fn custom_zones_are_refused_as_unsupported_everywhere() {

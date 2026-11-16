@@ -223,6 +223,10 @@ impl Conn<'_> {
 
     /// End the unit of work: commit on `Ok`, roll back on `Err` (nothing is written anywhere).
     ///
+    /// `finish` suspends once before the COMMIT (one scheduler turn per unit of work). That is a deliberate hook in the
+    /// production path: it makes the cancel point real, so that `tests/transaction.rs` can drop the future exactly
+    /// there and prove that the next access rolls back (K1).
+    ///
     /// # Errors
     /// The error of `r`, or of the commit.
     pub async fn finish<T>(mut self, r: Result<T>) -> Result<T> {

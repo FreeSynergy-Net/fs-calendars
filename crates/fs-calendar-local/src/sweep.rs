@@ -3,9 +3,13 @@
 //!
 //! Pattern: Transaction script (one pass over the expired cuts, in the caller's transaction).
 
-use fs_calendar_testdata::draft::Result;
+use fs_calendar_testdata::draft::{
+    LocalDateTime, ObjectId, Override, OverrideChange, PersonRef, Result,
+};
 
 use crate::codec::{get_id, get_int, id_value, int};
+use crate::read::load;
+use crate::series::{put_exception, remove_exception};
 use crate::store::Conn;
 
 /// What a run removed.
@@ -15,13 +19,15 @@ pub struct Swept {
     pub cuts: usize,
     /// Hidden exceptions of `ThisAndFollowing` cuts (rows and envelopes).
     pub hidden: usize,
+    /// Deleted changed occurrences made a plain `Excluded` (their fields are gone, ADR 0073 data minimisation).
+    pub scrubbed: usize,
 }
 
 /// Remove the cuts with `until <= now` and the exceptions they hid.
 ///
 /// # Errors
 /// The engine's error.
-pub async fn sweep_expired(c: &Conn<'_>, now: i64) -> Result<Swept> {
+pub async fn sweep_expired(c: &Conn<'_>, now: i64, actor: &PersonRef) -> Result<Swept> {
     let cuts = c
         .query(
             "SELECT appointment, recurrence_id, following FROM calendar_cut WHERE until <= ?",
@@ -47,8 +53,49 @@ pub async fn sweep_expired(c: &Conn<'_>, now: i64) -> Result<Swept> {
                 out.hidden += 1;
             }
         }
+        if get_int(cut, 2)? == 0 {
+            out.scrubbed += scrub(c, master, at, now, actor).await?;
+        }
         c.exec("DELETE FROM calendar_cut WHERE appointment = ? AND recurrence_id = ? AND following = ?", vec![id_value(master), int(at), int(get_int(cut, 2)?)]).await?;
         out.cuts += 1;
     }
     Ok(out)
+}
+
+/// An expired `This` cut of a changed occurrence: the row still holds the fields of the change (`restore` needed
+/// them). After the period they are removed: the occurrence stays deleted, as a plain `Excluded`.
+async fn scrub(
+    c: &Conn<'_>,
+    master: ObjectId,
+    at: i64,
+    now: i64,
+    actor: &PersonRef,
+) -> Result<usize> {
+    let rows = c
+        .query(
+            "SELECT 1 FROM calendar_appointment e WHERE e.master = ? AND e.recurrence_id = ? AND e.excluded = 1 \
+             AND EXISTS (SELECT 1 FROM calendar_override_field f WHERE f.appointment = e.id)",
+            vec![id_value(master), int(at)],
+        )
+        .await?;
+    if rows.is_empty() {
+        return Ok(0);
+    }
+    let Some(m) = load(c, "t.id = ? AND t.master IS NULL", vec![id_value(master)]).await? else {
+        return Ok(0);
+    };
+    let rid: LocalDateTime = crate::codec::int_to_local(at)?;
+    remove_exception(c, master, rid).await?;
+    put_exception(
+        c,
+        &m.appt,
+        &Override {
+            recurrence_id: rid,
+            change: OverrideChange::Excluded,
+        },
+        actor,
+        now,
+    )
+    .await?;
+    Ok(1)
 }

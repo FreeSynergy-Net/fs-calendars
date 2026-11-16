@@ -96,7 +96,7 @@ impl LocalAppointments {
     /// The engine's error.
     pub async fn sweep_expired(&self) -> Result<crate::sweep::Swept> {
         let c = self.store.begin().await?;
-        let r = crate::sweep::sweep_expired(&c, self.clock.now()).await;
+        let r = crate::sweep::sweep_expired(&c, self.clock.now(), &self.actor).await;
         c.finish(r).await
     }
 

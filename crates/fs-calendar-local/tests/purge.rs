@@ -133,37 +133,6 @@ async fn the_trash_period_must_be_positive_and_series_go_with_their_exceptions()
     );
 }
 
-/// Poll a future exactly once with a waker that does nothing, then drop it: a cancel between two awaits.
-fn poll_once_and_drop<F: std::future::Future>(f: F) -> bool {
-    let mut f = std::pin::pin!(f);
-    let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
-    f.as_mut().poll(&mut cx).is_ready()
-}
-
-#[tokio::test]
-async fn a_future_cancelled_inside_finish_still_rolls_back_at_the_next_access() {
-    let f = fx().await;
-    let id = "01927f00-0000-7000-8000-0000000000dd";
-    let c = f.p.store().begin().await.unwrap();
-    c.exec(
-        &format!("INSERT INTO purged_objects (object_id) VALUES ('{id}')"),
-        Vec::new(),
-    )
-    .await
-    .unwrap();
-    let ready = poll_once_and_drop(c.finish(Ok(())));
-    assert!(
-        !ready,
-        "finish must have a suspension point before the COMMIT, or this test proves nothing"
-    );
-    assert_eq!(
-        f.count("purged_objects").await,
-        0,
-        "the half finished unit of work is rolled back, not committed"
-    );
-    f.make_berlin("danach", 2, 9).await;
-}
-
 #[tokio::test]
 async fn the_period_run_forgets_expired_cuts_and_their_hidden_exceptions() {
     use common::series::{days, following, this, title, weekly};
@@ -223,4 +192,35 @@ async fn the_final_delete_forgets_the_marks_of_the_object() {
         f.count("purged_objects").await + f.count("unlogged_ids").await,
         0
     );
+}
+
+#[tokio::test]
+async fn the_period_run_removes_the_fields_of_a_deleted_changed_occurrence() {
+    use common::series::{days, this, title, weekly};
+    let f = fx().await;
+    let a = weekly(&f).await;
+    let u =
+        f.p.update(a.id, a.revision, title("Geheim"), this(9))
+            .await
+            .unwrap();
+    let d = f.p.delete(a.id, u.revision, this(9)).await.unwrap();
+    assert_eq!(f.count("calendar_override_field").await, 1);
+    f.set_now(d.restorable_until.unwrap().millis());
+    let swept = f.p.sweep_expired().await.unwrap();
+    assert_eq!((swept.cuts, swept.scrubbed), (1, 1));
+    assert_eq!(f.count("calendar_override_field").await, 0);
+    let rows = f
+        .rows("SELECT title FROM calendar_appointment WHERE master IS NOT NULL")
+        .await;
+    assert_eq!(
+        rows,
+        [[turso::Value::Text("Montag".into())]],
+        "the changed title is gone from the row"
+    );
+    assert_eq!(
+        days(&f).await.instances.len(),
+        4,
+        "the occurrence stays deleted"
+    );
+    assert_eq!(f.p.get(a.id).await.unwrap().unwrap().overrides.len(), 1);
 }

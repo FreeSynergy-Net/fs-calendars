@@ -83,7 +83,10 @@ pub async fn put_exception(
         .await?;
         return Ok(());
     }
-    let eid = existing.unwrap_or_else(|| new_id(now));
+    let eid = match existing {
+        Some(e) => e,
+        None => new_id(now)?,
+    };
     let mut m = master.clone();
     m.id = eid;
     m.when = when_at(&master.when, at);

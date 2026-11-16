@@ -190,7 +190,7 @@ pub async fn log(
     if !unlogged.is_empty() {
         return Ok(());
     }
-    let aid = id_text(new_id(now));
+    let aid = id_text(new_id(now)?);
     let [pid, part, pabzug] = person_values(actor);
     let kind_word = word(&HISTORY_KIND, kind);
     c.insert(

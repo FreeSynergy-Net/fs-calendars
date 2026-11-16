@@ -130,7 +130,7 @@ pub async fn update_following(
     let cur = live(c, id, expected).await?.appt;
     let at = occurrence(&cur, rid)?;
     let start = series_start(&cur.when).unwrap_or(at);
-    let tail_id = new_id(now);
+    let tail_id = new_id(now)?;
     let first_uid = cur
         .related
         .iter()

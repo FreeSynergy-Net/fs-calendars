@@ -10,7 +10,7 @@ const MS: i64 = 1_794_823_200_000;
 const N: usize = 20_000;
 
 fn ids(n: usize) -> Vec<String> {
-    (0..n).map(|_| id_text(new_id(MS))).collect()
+    (0..n).map(|_| id_text(new_id(MS).unwrap())).collect()
 }
 
 #[test]
@@ -31,9 +31,9 @@ fn ids_are_uuid_v7_shaped_and_increase_within_a_process() {
             .all(|i| i.as_bytes()[14] == b'7'
                 && matches!(i.as_bytes()[19], b'8' | b'9' | b'a' | b'b'))
     );
-    let late = id_text(new_id(MS + 5000));
+    let late = id_text(new_id(MS + 5000).unwrap());
     assert!(late > *v.last().unwrap(), "a later time sorts later");
-    let back = id_text(new_id(MS - 5000));
+    let back = id_text(new_id(MS - 5000).unwrap());
     assert!(
         back > late,
         "a clock that jumps back does not make ids go back"
