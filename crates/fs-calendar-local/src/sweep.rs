@@ -8,7 +8,7 @@
 use fs_calendar_testdata::draft::{LocalDateTime, ObjectId, PersonRef, Result};
 use fs_objects::v5;
 use fs_objects::v5::log::redact;
-use fs_objects::v5::migrate::StepFuture;
+use fs_objects::v5::purge::{Done, HookFuture};
 use fs_types as ft;
 
 use crate::bridge::{adapt, oid, person, person_back, to_v5};
@@ -31,35 +31,26 @@ pub struct Swept {
     pub objects: usize,
 }
 
-const HIDDEN: &str = "SELECT COUNT(*) FROM calendar_appointment a JOIN calendar_cut k ON a.master = k.appointment \
-     AND a.hidden_by = k.recurrence_id WHERE k.until <= ? AND k.following <> 0";
-const SCRUBBED: &str = "SELECT COUNT(*) FROM calendar_cut k WHERE k.until <= ? AND k.following = 0 AND EXISTS \
-     (SELECT 1 FROM calendar_appointment e WHERE e.master = k.appointment AND e.recurrence_id = k.recurrence_id \
-     AND e.excluded = 1 AND EXISTS (SELECT 1 FROM calendar_override_field f WHERE f.appointment = e.id))";
-
-/// Run the deadlines of the calendar: expired cuts, then the final delete of what the trash period ended.
+/// Run the deadlines of the calendar: expired cuts, then the final delete of what the trash period ended. The counts
+/// are what the layer and the hook really did, not a count taken before.
 ///
 /// # Errors
 /// The engine's error.
 pub async fn sweep_expired(c: &Conn<'_>, now: i64, actor: &PersonRef) -> Result<Swept> {
-    let count = |sql: &'static str| async move {
-        let rows = c.query(sql, vec![int(now)]).await?;
-        rows.first()
-            .map_or(Ok(0), |r| get_int(r, 0))
-            .map(|n| usize::try_from(n).unwrap_or(0))
-    };
-    let (hidden, scrubbed) = (count(HIDDEN).await?, count(SCRUBBED).await?);
     let done = v5::purge::sweep(c.inner(), &DOMAIN, now, &person(actor)?)
         .await
         .map_err(adapt)?;
-    let cuts = done.rows.iter().map(|(_, n)| *n).sum();
     Ok(Swept {
-        cuts,
-        hidden,
-        scrubbed,
+        cuts: done.rows.iter().map(|(_, n)| *n).sum(),
+        hidden: done.changed_of(HIDDEN),
+        scrubbed: done.changed_of(SCRUBBED),
         objects: done.objects,
     })
 }
+
+/// The kinds the hook reports (`Swept::changed` of the layer).
+const HIDDEN: &str = "hidden";
+const SCRUBBED: &str = "scrubbed";
 
 /// The hook of `calendar_cut`: the layer calls it for every expired cut, before the row is deleted.
 pub fn on_cut<'a>(
@@ -67,7 +58,7 @@ pub fn on_cut<'a>(
     row: &'a Row,
     now: i64,
     actor: &'a ft::PersonRef,
-) -> StepFuture<'a> {
+) -> HookFuture<'a> {
     Box::pin(async move {
         let c = Conn::Borrowed(c);
         let actor = person_back(actor).map_err(to_v5)?;
@@ -75,7 +66,7 @@ pub fn on_cut<'a>(
     })
 }
 
-async fn expired(c: &Conn<'_>, cut: &Row, now: i64, actor: &PersonRef) -> Result<()> {
+async fn expired(c: &Conn<'_>, cut: &Row, now: i64, actor: &PersonRef) -> Result<Done> {
     let (master, at) = (get_id(cut, 0)?, get_int(cut, 1)?);
     if get_int(cut, 2)? != 0 {
         let hidden = c
@@ -84,22 +75,31 @@ async fn expired(c: &Conn<'_>, cut: &Row, now: i64, actor: &PersonRef) -> Result
                 vec![id_value(master), int(at)],
             )
             .await?;
+        let mut gone = 0;
         for h in &hidden {
-            c.exec(
-                "DELETE FROM objects WHERE id = ?",
-                vec![id_value(get_id(h, 0)?)],
-            )
-            .await?;
+            let n = c
+                .exec(
+                    "DELETE FROM objects WHERE id = ?",
+                    vec![id_value(get_id(h, 0)?)],
+                )
+                .await?;
+            gone += usize::try_from(n).unwrap_or(0);
         }
+        Ok((HIDDEN, gone))
     } else {
-        scrub(c, master, at, now, actor).await?;
+        Ok((SCRUBBED, scrub(c, master, at, now, actor).await?))
     }
-    Ok(())
 }
 
 /// An expired `This` cut of a changed occurrence: the row still holds the fields of the change (`restore` needed
 /// them). After the period they are removed: the occurrence stays deleted, as a plain `Excluded`.
-async fn scrub(c: &Conn<'_>, master: ObjectId, at: i64, now: i64, actor: &PersonRef) -> Result<()> {
+async fn scrub(
+    c: &Conn<'_>,
+    master: ObjectId,
+    at: i64,
+    now: i64,
+    actor: &PersonRef,
+) -> Result<usize> {
     let rows = c
         .query(
             "SELECT 1 FROM calendar_appointment e WHERE e.master = ? AND e.recurrence_id = ? AND e.excluded = 1 \
@@ -108,10 +108,10 @@ async fn scrub(c: &Conn<'_>, master: ObjectId, at: i64, now: i64, actor: &Person
         )
         .await?;
     if rows.is_empty() {
-        return Ok(());
+        return Ok(0);
     }
     let Some(m) = load(c, "t.id = ? AND t.master IS NULL", vec![id_value(master)]).await? else {
-        return Ok(());
+        return Ok(0);
     };
     let rid: LocalDateTime = crate::codec::int_to_local(at)?;
     scrub_exception(c, &m.appt, rid, actor, now).await?;
@@ -120,5 +120,6 @@ async fn scrub(c: &Conn<'_>, master: ObjectId, at: i64, now: i64, actor: &Person
     let key = fs_calendar_testdata::draft::BasicValue::canonical(&rid);
     redact(c.inner(), oid(master), &key, "override.%")
         .await
-        .map_err(adapt)
+        .map_err(adapt)?;
+    Ok(1)
 }

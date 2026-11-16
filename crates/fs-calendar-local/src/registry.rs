@@ -23,12 +23,22 @@ pub const CHANNELS: &[&str] = &[
     "subscription",
 ];
 
-/// The exceptions of a series are objects of their own: their envelopes go with the master at the final delete.
-const CHILDREN: &[Child] = &[Child {
-    table: "calendar_appointment",
-    parent: "master",
-    object: "id",
-}];
+/// Dependent objects whose envelopes go with their parent at the final delete: the exceptions of a series (objects of
+/// their own) and the appointments of a collection (`calendar_appointment.collection` is a foreign key without
+/// `ON DELETE CASCADE`: a collection that ended its trash period with appointments would otherwise block the whole
+/// period run). The layer follows them recursively and deletes the dependents first.
+const CHILDREN: &[Child] = &[
+    Child {
+        table: "calendar_appointment",
+        parent: "master",
+        object: "id",
+    },
+    Child {
+        table: "calendar_appointment",
+        parent: "collection",
+        object: "id",
+    },
+];
 
 /// The cuts that a restore period ended (ADR 0073).
 const EXPIRIES: &[Expiry] = &[Expiry {

@@ -76,7 +76,7 @@ pub fn media(t: &str) -> MediaType {
 }
 
 pub async fn import_text(e: &Ex, text: &str, ty: &str) -> ImportReport {
-    let f: FileRef = e.files.put(text.as_bytes(), &media(ty));
+    let f: FileRef = e.files.put(text.as_bytes(), &media(ty)).unwrap();
     e.ex.import(f, &media(ty), &ctx(e)).await.unwrap()
 }
 

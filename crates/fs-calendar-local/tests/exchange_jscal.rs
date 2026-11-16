@@ -71,7 +71,7 @@ async fn a_bad_event_fails_alone_and_a_foreign_format_is_unsupported() {
         matches!(t, Err(Error::Unsupported { ref capability, .. }) if capability == "exchange.export"),
         "{t:?}"
     );
-    let f = e.files.put(b"x", &media("text/plain"));
+    let f = e.files.put(b"x", &media("text/plain")).unwrap();
     let i =
         e.ex.import(f, &media("text/plain"), &common::exchange::ctx(&e))
             .await;

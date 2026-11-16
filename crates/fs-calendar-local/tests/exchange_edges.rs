@@ -78,7 +78,7 @@ async fn a_broken_event_beside_a_good_one_fails_alone() {
 #[tokio::test]
 async fn a_file_is_read_only_with_the_checksum_it_was_promised() {
     let files = MemoryFiles::default();
-    let mut f = files.put(b"hello", &media("text/plain"));
+    let mut f = files.put(b"hello", &media("text/plain")).unwrap();
     assert_eq!(files.read(&f).await.unwrap(), b"hello");
     f.sha256[0] ^= 1;
     assert!(

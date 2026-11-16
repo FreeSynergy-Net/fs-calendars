@@ -9,10 +9,13 @@ use fs_calendar_testdata::draft::{
     Result, Utc, Zone,
 };
 use fs_calendar_testdata::zone::{local, naive, naive_date, plain};
+use fs_objects::v5::codec as layer;
 use turso::Value;
 
-/// One engine row.
-pub type Row = Vec<Value>;
+use crate::bridge::adapt;
+
+// What does not touch a trait type is the layer's own code (one place): rows and engine values.
+pub use layer::{Row, boolean, int, opt_int, opt_text, text};
 
 #[must_use]
 pub fn invalid(field: &str, reason: &str) -> Error {
@@ -59,57 +62,26 @@ pub fn parse_id(text: &str) -> Option<ObjectId> {
     Some(ObjectId(out))
 }
 
-pub fn int(v: i64) -> Value {
-    Value::Integer(v)
-}
-#[must_use]
-pub fn text(v: &str) -> Value {
-    Value::Text(v.to_owned())
-}
-#[must_use]
-pub fn boolean(v: bool) -> Value {
-    Value::Integer(i64::from(v))
-}
-#[must_use]
-pub fn opt_text(v: Option<&str>) -> Value {
-    v.map_or(Value::Null, text)
-}
-#[must_use]
-pub fn opt_int(v: Option<i64>) -> Value {
-    v.map_or(Value::Null, Value::Integer)
-}
 #[must_use]
 pub fn id_value(id: ObjectId) -> Value {
     Value::Text(id_text(id))
 }
 
-/// Reading a column of a row.
+/// Reading a column of a row (the layer's readers; a damaged row is the same `Unavailable`).
 pub fn get_int(row: &Row, i: usize) -> Result<i64> {
-    match row.get(i) {
-        Some(Value::Integer(v)) => Ok(*v),
-        _ => Err(damaged("expected an integer")),
-    }
+    layer::get_int(row, i).map_err(adapt)
 }
 pub fn get_text(row: &Row, i: usize) -> Result<String> {
-    match row.get(i) {
-        Some(Value::Text(v)) => Ok(v.clone()),
-        _ => Err(damaged("expected text")),
-    }
+    layer::get_text(row, i).map_err(adapt)
 }
 pub fn get_opt_text(row: &Row, i: usize) -> Result<Option<String>> {
-    match row.get(i) {
-        Some(Value::Null) => Ok(None),
-        _ => get_text(row, i).map(Some),
-    }
+    layer::get_opt_text(row, i).map_err(adapt)
 }
 pub fn get_opt_int(row: &Row, i: usize) -> Result<Option<i64>> {
-    match row.get(i) {
-        Some(Value::Null) => Ok(None),
-        _ => get_int(row, i).map(Some),
-    }
+    layer::get_opt_int(row, i).map_err(adapt)
 }
 pub fn get_bool(row: &Row, i: usize) -> Result<bool> {
-    Ok(get_int(row, i)? != 0)
+    layer::get_bool(row, i).map_err(adapt)
 }
 pub fn get_id(row: &Row, i: usize) -> Result<ObjectId> {
     parse_id(&get_text(row, i)?).ok_or_else(|| damaged("not an object id"))
