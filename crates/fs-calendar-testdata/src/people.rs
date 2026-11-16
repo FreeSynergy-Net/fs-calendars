@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 
-use crate::draft::{Error, PersonArt, PersonDirectory, PersonRef, Reference, Result};
+use crate::draft::{Error, PersonArt, PersonDirectory, PersonRef, Result};
 use crate::ids::{person, person_iri};
 
 /// One known person.
@@ -91,7 +91,7 @@ impl PersonDirectory for FakePeople {
             *next
         };
         let p = PersonRef {
-            id: Reference(person_iri(n).0),
+            id: person_iri(n),
             art: PersonArt::Profile,
             abzug: None,
         };

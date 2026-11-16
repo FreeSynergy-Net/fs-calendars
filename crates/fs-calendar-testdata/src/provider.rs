@@ -89,8 +89,8 @@ impl Appointments for FakeAppointments {
     ) -> Result<Deleted> {
         self.delete_impl(id, expected, scope)
     }
-    async fn restore(&self, id: ObjectId) -> Result<Appointment> {
-        self.restore_impl(id)
+    async fn restore(&self, id: ObjectId, scope: SeriesScope) -> Result<Appointment> {
+        self.restore_impl(id, scope)
     }
     async fn invite(
         &self,
@@ -104,13 +104,14 @@ impl Appointments for FakeAppointments {
     async fn respond(
         &self,
         id: ObjectId,
+        expected: Revision,
         who: &PersonRef,
         answer: Answer,
         comment: Option<&str>,
         proposal: Option<When>,
         scope: SeriesScope,
     ) -> Result<Appointment> {
-        self.respond_impl(id, who, answer, comment, proposal.as_ref(), scope)
+        self.respond_impl(id, expected, who, answer, comment, proposal.as_ref(), scope)
     }
     async fn history(
         &self,

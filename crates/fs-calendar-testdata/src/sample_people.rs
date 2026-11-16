@@ -4,13 +4,16 @@
 
 use crate::draft::{
     Alert, AlertAction, Attendee, Location, MediaType, Origin, OriginChannel, Participant,
-    ParticipationStatus, Reference, RelativeTo, Revision, Roles, Trigger, Utc, When, Zone,
+    ParticipationStatus, RelativeTo, Revision, Roles, Trigger, Utc, When,
 };
 use crate::ids::person;
 use crate::sample::{CUSTOM_ZONE, at, timed};
 use crate::sample_items::Maker;
+use crate::zone;
 
-const NOW: Utc = Utc(1_794_816_000_000);
+fn now() -> Utc {
+    Utc::from_millis(1_794_816_000_000)
+}
 
 fn who(key: &str, n: u64, status: ParticipationStatus, owner: bool) -> Participant {
     Participant {
@@ -37,25 +40,25 @@ fn who(key: &str, n: u64, status: ParticipationStatus, owner: bool) -> Participa
 fn imported_file() -> Origin {
     Origin {
         channel: OriginChannel::File,
-        source: Reference(
-            "urn:sha256:0000000000000000000000000000000000000000000000000000000000000001"
-                .to_owned(),
+        source: zone::reference(
+            "urn:sha256:0000000000000000000000000000000000000000000000000000000000000001",
         ),
         media_type: MediaType("text/calendar".to_owned()),
         foreign_uid: "floating-imported@example.org".to_owned(),
         foreign_recurrence_id: None,
         foreign_etag: None,
         prod_id: Some("-//Example//Calendar//EN".to_owned()),
-        imported: NOW,
+        imported: now(),
         importer: "fs-calendar-ics 0.0.0".to_owned(),
         rev_at_import: Revision(1),
+        original: None,
     }
 }
 
 fn room(key: &str) -> Participant {
     let mut p = who(key, 1, ParticipationStatus::Accepted, false);
-    p.who = Attendee::Location(Reference(
-        "urn:uuid:00000000-0000-7000-a000-000000000004".to_owned(),
+    p.who = Attendee::Location(zone::reference(
+        "urn:uuid:00000000-0000-7000-a000-000000000004",
     ));
     p.roles = Roles::default();
     p.expect_reply = false;
@@ -83,7 +86,7 @@ pub(crate) fn zone_cases(m: &mut Maker) {
         "Importiert (schwebend)",
         When::Timed {
             start: at(2026, 11, 19, 8, 0),
-            zone: Zone::Iana("Europe/Berlin".to_owned()),
+            zone: zone::iana("Europe/Berlin"),
             length: crate::draft::Span {
                 days: 0,
                 seconds: 3600,
@@ -112,7 +115,7 @@ pub(crate) fn zone_cases(m: &mut Maker) {
         "Außenstelle",
         When::Timed {
             start: at(2026, 11, 20, 14, 0),
-            zone: Zone::Custom(CUSTOM_ZONE.to_owned()),
+            zone: zone::custom(CUSTOM_ZONE),
             length: crate::draft::Span {
                 days: 0,
                 seconds: 3600,

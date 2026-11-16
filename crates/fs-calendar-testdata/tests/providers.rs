@@ -12,8 +12,8 @@ use std::time::{Duration, Instant};
 
 use common::{loaded, utc};
 use fs_calendar_testdata::draft::{
-    AppointmentPatch, Appointments, CAPABILITIES, Error, PersonArt, PersonDirectory, PersonRef,
-    Revision, SeriesScope,
+    AppointmentPatch, Appointments, Attendee, BasicValue, CAPABILITIES, Error, PersonArt,
+    PersonDirectory, PersonRef, Revision, SeriesScope,
 };
 use fs_calendar_testdata::ids::{object_id, person};
 use fs_calendar_testdata::{DECISIONS, FailingAppointments, SlowAppointments, sample};
@@ -45,8 +45,13 @@ async fn every_method_of_the_failing_provider_is_unavailable() {
         Err(Error::Unavailable(_))
     ));
     assert!(matches!(
-        f.free_busy(&[], utc(2026, 1, 1, 0, 0), utc(2026, 1, 2, 0, 0))
-            .await,
+        f.free_busy(
+            &[],
+            utc(2026, 1, 1, 0, 0),
+            utc(2026, 1, 2, 0, 0),
+            &common::utc_zone(),
+        )
+        .await,
         Err(Error::Unavailable(_))
     ));
     assert!(matches!(
@@ -89,7 +94,12 @@ async fn the_fake_offers_all_capabilities_but_free_busy() {
         .collect();
     assert_eq!(off, vec!["event.freebusy"]);
     let r = f
-        .free_busy(&[person(1)], utc(2026, 1, 1, 0, 0), utc(2026, 1, 2, 0, 0))
+        .free_busy(
+            &[Attendee::Actor(person(1))],
+            utc(2026, 1, 1, 0, 0),
+            utc(2026, 1, 2, 0, 0),
+            &common::utc_zone(),
+        )
         .await;
     assert!(
         matches!(r, Err(Error::Unsupported { capability, .. }) if capability == "event.freebusy")
@@ -116,7 +126,7 @@ fn the_sample_is_complete_and_has_no_names_in_appointments() {
             a.participants
                 .iter()
                 .all(|p| fs_calendar_testdata::ids::actor(p)
-                    .is_none_or(|x| x.id.0.starts_with("urn:uuid:"))),
+                    .is_none_or(|x| x.id.canonical().starts_with("urn:uuid:"))),
             "{slug}: people are references"
         );
     }

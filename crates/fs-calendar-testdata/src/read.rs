@@ -7,10 +7,9 @@ use crate::draft::{
     HistoryEntry, ObjectId, Page, Place, Problem, Result, Utc, Window, Zone,
 };
 use crate::fake::FakeAppointments;
-use crate::ids::actor;
 use crate::instances::in_window;
 use crate::state::{Item, State};
-use crate::zone::bounds;
+use crate::zone::{self, bounds};
 
 fn page<T: Clone>(all: &[T], after: Option<&Place>, size: usize) -> Result<Page<T>> {
     if size == 0 {
@@ -45,16 +44,17 @@ fn summary(a: &Appointment) -> AppointmentSummary {
         when: a.when.clone(),
         recurring: !a.recurrence.is_empty(),
         revision: a.revision,
+        restorable_until: None,
     }
 }
 
 /// The zone of the places that have no viewer (sorting, `list`): UTC.
 fn utc_zone() -> Zone {
-    Zone::Iana("UTC".to_owned())
+    zone::iana("UTC")
 }
 
 fn first_start(s: &State, a: &Appointment) -> i64 {
-    bounds(&a.when, &s.customs, &utc_zone()).map_or(i64::MAX, |(start, _)| start.0)
+    bounds(&a.when, &s.customs, &utc_zone()).map_or(i64::MAX, |(start, _)| start.millis())
 }
 
 fn contains(a: &Appointment, needle: &str) -> bool {
@@ -106,16 +106,17 @@ impl FakeAppointments {
             .into_iter()
             .filter(|a| q.text.as_deref().is_none_or(|t| contains(a, t)))
             .filter(|a| {
-                q.participant.as_ref().is_none_or(|p| {
-                    a.participants
-                        .iter()
-                        .any(|x| actor(x).is_some_and(|y| y.id == p.id))
-                })
+                q.participant
+                    .as_ref()
+                    .is_none_or(|p| a.participants.iter().any(|x| x.who == *p))
             })
             .filter(|a| match (q.from, q.to) {
                 (None, None) => true,
                 (from, to) => {
-                    let (lo, hi) = (from.unwrap_or(Utc(i64::MIN)), to.unwrap_or(Utc(i64::MAX)));
+                    let (lo, hi) = (
+                        from.unwrap_or(Utc::from_millis(i64::MIN)),
+                        to.unwrap_or(Utc::from_millis(i64::MAX)),
+                    );
                     let (found, _) = in_window(a, &s.customs, None, &utc_zone(), lo, hi);
                     !found.is_empty()
                 }

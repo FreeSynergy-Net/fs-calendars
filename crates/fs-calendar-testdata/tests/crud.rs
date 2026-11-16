@@ -10,7 +10,7 @@ mod common;
 use common::{loaded, utc, window};
 use fs_calendar_testdata::draft::{
     Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, Appointments, Error,
-    HistoryKind, Revision, SeriesScope, Value, When, Zone,
+    HistoryKind, Revision, SeriesScope, Value, When,
 };
 use fs_calendar_testdata::sample::{at, rule, timed};
 use fs_calendar_testdata::{FakeAppointments, ids};
@@ -64,7 +64,7 @@ async fn bad_input_writes_nothing() {
     let f = FakeAppointments::new();
     let bad_zone = When::Timed {
         start: at(2026, 11, 17, 9, 0),
-        zone: Zone::Iana("Mars/Olympus".to_owned()),
+        zone: fs_calendar_testdata::zone::iana("Mars/Olympus"),
         length: fs_calendar_testdata::draft::Span {
             days: 0,
             seconds: 60,
@@ -78,15 +78,7 @@ async fn bad_input_writes_nothing() {
     assert!(
         matches!(f.create(draft(&f, "  ", timed(at(2026, 11, 17, 9, 0), "UTC", 60))).await, Err(Error::Invalid(p)) if p[0].field == "title")
     );
-    assert!(matches!(
-        f.create(draft(
-            &f,
-            "x",
-            fs_calendar_testdata::sample::all_day(2026, 2, 30, 1)
-        ))
-        .await,
-        Err(Error::Invalid(_))
-    ));
+    // A date that does not exist (30 February) cannot be built any more: `Date` only comes from `parse`.
     assert!(matches!(
         f.create(draft(
             &f,
@@ -183,7 +175,9 @@ async fn move_to_another_zone_is_a_typed_change() {
     assert_eq!(c[0].field, "when.zone");
     assert_eq!(
         c[0].new,
-        Some(Value::Zone(Zone::Iana("America/New_York".to_owned())))
+        Some(Value::Zone(fs_calendar_testdata::zone::iana(
+            "America/New_York"
+        )))
     );
 }
 
@@ -197,7 +191,7 @@ async fn delete_goes_to_the_trash_and_restore_brings_it_back() {
         .unwrap();
     assert_eq!(
         d.restorable_until,
-        Some(fs_calendar_testdata::draft::Utc(
+        Some(fs_calendar_testdata::draft::Utc::from_millis(
             1_794_816_000_000 + 30 * 24 * 3600 * 1000
         ))
     );
@@ -215,10 +209,13 @@ async fn delete_goes_to_the_trash_and_restore_brings_it_back() {
         ..AppointmentQuery::default()
     };
     assert_eq!(f.list(&q, None, 10).await.unwrap().items.len(), 1);
-    assert!(f.restore(a.id).await.is_ok());
+    assert!(f.restore(a.id, SeriesScope::Whole).await.is_ok());
     assert!(f.get(a.id).await.unwrap().is_some());
     assert!(
-        matches!(f.restore(a.id).await, Err(Error::Invalid(_))),
+        matches!(
+            f.restore(a.id, SeriesScope::Whole).await,
+            Err(Error::Invalid(_))
+        ),
         "not in the trash any more"
     );
 }
@@ -230,10 +227,13 @@ async fn restore_after_the_period_is_refused() {
     f.delete(a.id, a.revision, SeriesScope::Whole)
         .await
         .unwrap();
-    f.set_now(fs_calendar_testdata::draft::Utc(
+    f.set_now(fs_calendar_testdata::draft::Utc::from_millis(
         1_794_816_000_000 + 31 * 24 * 3600 * 1000,
     ));
-    assert!(matches!(f.restore(a.id).await, Err(Error::Invalid(_))));
+    assert!(matches!(
+        f.restore(a.id, SeriesScope::Whole).await,
+        Err(Error::Invalid(_))
+    ));
 }
 
 #[tokio::test]

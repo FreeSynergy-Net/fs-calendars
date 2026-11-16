@@ -17,7 +17,7 @@ use fs_calendar_testdata::sample::at;
 
 fn invitee(n: u64) -> Invitee {
     Invitee {
-        person: person(n),
+        who: Attendee::Actor(person(n)),
         roles: Roles {
             attendee: true,
             ..Roles::default()
@@ -64,6 +64,7 @@ async fn respond_changes_one_status_and_logs_old_and_new() {
     let b = f
         .respond(
             a.id,
+            a.revision,
             &person(4),
             Answer::Tentative,
             Some("vielleicht"),
@@ -106,6 +107,7 @@ async fn a_proposal_is_logged_and_a_stranger_cannot_answer() {
     let when = fs_calendar_testdata::sample::timed(at(2026, 11, 19, 16, 0), "Europe/Berlin", 60);
     f.respond(
         a.id,
+        a.revision,
         &person(2),
         Answer::Decline,
         None,
@@ -120,7 +122,7 @@ async fn a_proposal_is_logged_and_a_stranger_cannot_answer() {
     ));
     assert_eq!(h.items[0].kind, HistoryKind::Reject);
     assert!(
-        matches!(f.respond(a.id, &person(9), Answer::Accept, None, None, SeriesScope::Whole).await, Err(Error::Invalid(p)) if p[0].field == "who")
+        matches!(f.respond(a.id, f.get(a.id).await.unwrap().unwrap().revision, &person(9), Answer::Accept, None, None, SeriesScope::Whole).await, Err(Error::Invalid(p)) if p[0].field == "who")
     );
 }
 

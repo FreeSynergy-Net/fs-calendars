@@ -108,7 +108,7 @@ impl FakeAppointments {
         trash::delete(&mut self.lock(), id, expected, scope)
     }
 
-    pub(crate) fn restore_impl(&self, id: ObjectId) -> Result<Appointment> {
-        trash::restore(&mut self.lock(), id)
+    pub(crate) fn restore_impl(&self, id: ObjectId, scope: SeriesScope) -> Result<Appointment> {
+        trash::restore(&mut self.lock(), id, scope)
     }
 }

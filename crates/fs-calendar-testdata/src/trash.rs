@@ -4,10 +4,11 @@
 
 use crate::draft::{
     Appointment, Deleted, Error, HistoryKind, ObjectId, Override, OverrideChange, Result,
-    SeriesScope,
+    SeriesScope, Utc,
 };
 use crate::instances::series_start;
 use crate::scope::{checked, commit, invalid, occurrence, truncate, upsert};
+use crate::state::Cut;
 use crate::state::{Item, State, TRASH_MS};
 
 /// Delete with a scope: the whole thing goes to the trash; one occurrence becomes an `Excluded` override;
@@ -23,7 +24,7 @@ pub fn delete(
 ) -> Result<Deleted> {
     let cur = checked(state, id, Some(expected))?;
     let whole = |state: &mut State, cur: &Appointment| {
-        let until = Some(crate::draft::Utc(state.now.0 + TRASH_MS));
+        let until = Some(Utc::from_millis(state.now.millis() + TRASH_MS));
         state.items.insert(
             cur.id,
             Item {
@@ -42,6 +43,15 @@ pub fn delete(
         SeriesScope::Whole => Ok(whole(state, &cur)),
         SeriesScope::This { recurrence_id } => {
             occurrence(&cur, recurrence_id)?;
+            let until = Utc::from_millis(state.now.millis() + TRASH_MS);
+            state.cuts.push(Cut {
+                id,
+                recurrence_id,
+                following: false,
+                until,
+                recurrence: Vec::new(),
+                overrides: Vec::new(),
+            });
             let mut new = cur.clone();
             upsert(
                 &mut new,
@@ -54,7 +64,7 @@ pub fn delete(
             Ok(Deleted {
                 id,
                 scope,
-                restorable_until: None,
+                restorable_until: Some(until),
             })
         }
         SeriesScope::ThisAndFollowing { recurrence_id } => {
@@ -62,36 +72,86 @@ pub fn delete(
             if series_start(&cur.when) == Some(at) {
                 return Ok(whole(state, &cur));
             }
+            let until = Utc::from_millis(state.now.millis() + TRASH_MS);
             let mut new = cur.clone();
             truncate(&mut new, at);
+            let removed = cur
+                .overrides
+                .iter()
+                .filter(|o| !new.overrides.contains(o))
+                .cloned()
+                .collect();
+            state.cuts.push(Cut {
+                id,
+                recurrence_id,
+                following: true,
+                until,
+                recurrence: cur.recurrence.clone(),
+                overrides: removed,
+            });
             commit(state, cur.revision, new, HistoryKind::Delete, Vec::new());
             Ok(Deleted {
                 id,
                 scope,
-                restorable_until: None,
+                restorable_until: Some(until),
             })
         }
     }
 }
 
-/// Bring a trashed appointment back while the trash still holds it.
+/// Bring a deletion back while the trash still holds it. `Whole` (or any scope for a trashed appointment,
+/// which also covers `ThisAndFollowing` on the first occurrence) takes it out of the trash; `This` removes
+/// the `Excluded` override; `ThisAndFollowing` gives back the rules and overrides the cut took away.
 ///
 /// # Errors
-/// `NotFound` for an unknown id; `Invalid` when it is not in the trash or the period is over.
-pub fn restore(state: &mut State, id: ObjectId) -> Result<Appointment> {
+/// `NotFound` for an unknown id; `Invalid` when there is nothing to undo or the period is over.
+pub fn restore(state: &mut State, id: ObjectId, scope: SeriesScope) -> Result<Appointment> {
     let item = state.items.get(&id).ok_or(Error::NotFound(id))?.clone();
-    let Some(at) = item.deleted else {
-        return Err(invalid("id", "is not in the trash"));
-    };
-    if state.now.0 > at.0 + TRASH_MS {
-        return Err(invalid("id", "the restore period is over"));
+    if let Some(at) = item.deleted {
+        if state.now.millis() > at.millis() + TRASH_MS {
+            return Err(invalid("id", "the restore period is over"));
+        }
+        return Ok(commit(
+            state,
+            item.appt.revision,
+            item.appt,
+            HistoryKind::Undo,
+            Vec::new(),
+        ));
     }
-    let new = commit(
+    let rid = match scope {
+        SeriesScope::Whole => return Err(invalid("id", "is not in the trash")),
+        SeriesScope::This { recurrence_id } | SeriesScope::ThisAndFollowing { recurrence_id } => {
+            recurrence_id
+        }
+    };
+    let following = matches!(scope, SeriesScope::ThisAndFollowing { .. });
+    let Some(pos) = state
+        .cuts
+        .iter()
+        .position(|c| c.id == id && c.recurrence_id == rid && c.following == following)
+    else {
+        return Err(invalid("scope", "nothing was deleted there"));
+    };
+    let cut = state.cuts.remove(pos);
+    if state.now.millis() > cut.until.millis() {
+        return Err(invalid("scope", "the restore period is over"));
+    }
+    let mut new = item.appt.clone();
+    if following {
+        new.recurrence = cut.recurrence;
+        for o in cut.overrides {
+            upsert(&mut new, o);
+        }
+    } else {
+        new.overrides
+            .retain(|o| !(o.recurrence_id == rid && o.change == OverrideChange::Excluded));
+    }
+    Ok(commit(
         state,
         item.appt.revision,
-        item.appt,
+        new,
         HistoryKind::Undo,
         Vec::new(),
-    );
-    Ok(new)
+    ))
 }

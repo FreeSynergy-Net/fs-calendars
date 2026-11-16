@@ -23,7 +23,7 @@ pub fn object_number(id: ObjectId) -> u64 {
 /// A local person IRI (`urn:uuid:...`) with the number `n`.
 #[must_use]
 pub fn person_iri(n: u64) -> Reference {
-    Reference(format!("urn:uuid:00000000-0000-7000-8000-{n:012x}"))
+    crate::zone::reference(&format!("urn:uuid:00000000-0000-7000-8000-{n:012x}"))
 }
 
 /// A reference to the person with the number `n` (kind `Person`, no excerpt).

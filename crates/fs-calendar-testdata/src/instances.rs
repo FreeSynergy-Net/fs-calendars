@@ -49,7 +49,7 @@ pub fn when_at(base: &When, at: NaiveDateTime) -> When {
             length: *length,
         },
         When::AllDay { days, .. } => When::AllDay {
-            first: local(at).date,
+            first: local(at).date(),
             days: *days,
         },
     }

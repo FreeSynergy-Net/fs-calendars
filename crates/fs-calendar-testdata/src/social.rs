@@ -39,14 +39,14 @@ fn seen(a: &Appointment, scope: SeriesScope) -> Vec<Participant> {
 
 fn participant(
     key: String,
-    person: PersonRef,
+    who: Attendee,
     roles: Roles,
     expect_reply: bool,
     status: ParticipationStatus,
 ) -> Participant {
     Participant {
         key,
-        who: Attendee::Actor(person),
+        who,
         roles,
         status,
         expect_reply,
@@ -80,7 +80,7 @@ impl FakeAppointments {
             let me = s.viewer.clone();
             list.push(participant(
                 "p1".to_owned(),
-                me,
+                Attendee::Actor(me),
                 Roles {
                     owner: true,
                     attendee: true,
@@ -91,10 +91,7 @@ impl FakeAppointments {
             ));
         }
         for inv in invitees {
-            if list
-                .iter()
-                .any(|p| actor(p).is_some_and(|x| x.id == inv.person.id))
-            {
+            if list.iter().any(|p| p.who == inv.who) {
                 continue;
             }
             let key = format!("p{}", list.len() + 1);
@@ -102,11 +99,11 @@ impl FakeAppointments {
                 field: "participant".to_owned(),
                 row_key: Some(key.clone()),
                 old: None,
-                new: Some(Value::Person(inv.person.clone())),
+                new: Some(Value::Attendee(inv.who.clone())),
             });
             list.push(participant(
                 key,
-                inv.person.clone(),
+                inv.who.clone(),
                 inv.roles,
                 inv.expect_reply,
                 ParticipationStatus::NeedsAction,
@@ -127,9 +124,12 @@ impl FakeAppointments {
         )
     }
 
+    /// The arguments are those of the trait method `respond` (the trait fixes them).
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn respond_impl(
         &self,
         id: ObjectId,
+        expected: Revision,
         who: &PersonRef,
         answer: Answer,
         comment: Option<&str>,
@@ -137,7 +137,7 @@ impl FakeAppointments {
         scope: SeriesScope,
     ) -> Result<Appointment> {
         let mut s = self.lock();
-        let cur = s.live(id)?.appt.clone();
+        let cur = scope::checked(&s, id, Some(expected))?;
         let mut list = seen(&cur, scope);
         let Some(p) = list
             .iter_mut()
@@ -171,7 +171,6 @@ impl FakeAppointments {
             participants: Some(list),
             ..AppointmentPatch::default()
         };
-        let revision = cur.revision;
-        scope::write(&mut s, id, Some(revision), &patch, scope, kind, extra)
+        scope::write(&mut s, id, Some(expected), &patch, scope, kind, extra)
     }
 }

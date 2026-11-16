@@ -4,13 +4,14 @@
 //! The slug of an appointment is its name in tests; its `uid` is `urn:fs-testdata:<slug>`.
 
 use crate::draft::{
-    Appointment, CalendarInfo, Frequency, LocalDateTime, PlainDate, RecurrenceRule, Revision,
-    RuleEnd, Skip, Span, Weekday, When, Zone,
+    Appointment, BasicValue, CalendarInfo, Date, Frequency, LocalDateTime, RecurrenceRule,
+    Revision, RuleEnd, Skip, Span, Weekday, When,
 };
 use crate::fake::FakeAppointments;
 use crate::ids::{object_id, person};
 use crate::people::{FakePeople, Known};
 use crate::sample_items::appointments;
+use crate::zone;
 
 /// The custom zone of the sample ("/Custom/Aussenstelle"), a fixed offset of +05:30.
 pub const CUSTOM_ZONE: &str = "/Custom/Aussenstelle";
@@ -86,14 +87,21 @@ pub fn sample() -> Sample {
 }
 
 /// A wall-clock time (helper for the sample and for tests).
+///
+/// # Panics
+/// On a date or time that does not exist (a test-data mistake).
 #[must_use]
 pub fn at(year: i32, month: u8, day: u8, hour: u8, minute: u8) -> LocalDateTime {
-    LocalDateTime {
-        date: PlainDate { year, month, day },
-        hour,
-        minute,
-        second: 0,
-    }
+    LocalDateTime::new(date(year, month, day), hour, minute, 0).expect("a time of the test data")
+}
+
+/// A calendar date (helper for the sample and for tests).
+///
+/// # Panics
+/// On a date that does not exist (a test-data mistake).
+#[must_use]
+pub fn date(year: i32, month: u8, day: u8) -> Date {
+    Date::parse(&format!("{year:04}-{month:02}-{day:02}")).expect("a date of the test data")
 }
 
 /// A timed `When` in an IANA zone, `minutes` long.
@@ -101,7 +109,7 @@ pub fn at(year: i32, month: u8, day: u8, hour: u8, minute: u8) -> LocalDateTime 
 pub fn timed(start: LocalDateTime, zone: &str, minutes: u32) -> When {
     When::Timed {
         start,
-        zone: Zone::Iana(zone.to_owned()),
+        zone: zone::iana(zone),
         length: Span {
             days: 0,
             seconds: minutes * 60,
@@ -112,10 +120,13 @@ pub fn timed(start: LocalDateTime, zone: &str, minutes: u32) -> When {
 }
 
 /// An all-day `When`.
+///
+/// # Panics
+/// On a date that does not exist (a test-data mistake).
 #[must_use]
 pub fn all_day(year: i32, month: u8, day: u8, days: u32) -> When {
     When::AllDay {
-        first: PlainDate { year, month, day },
+        first: date(year, month, day),
         days,
     }
 }

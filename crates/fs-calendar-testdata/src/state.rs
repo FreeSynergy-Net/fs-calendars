@@ -6,8 +6,8 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::draft::{
     Appointment, AppointmentPatch, CalendarInfo, Change, Error, FieldChange, FreeBusy,
-    HistoryEntry, HistoryKind, ObjectId, PersonRef, Privacy, Result, Revision, Status, TextType,
-    Utc, When,
+    HistoryEntry, HistoryKind, LocalDateTime, ObjectId, Override, PersonRef, Privacy,
+    RecurrenceRule, Result, Revision, Status, TextType, Utc, When,
 };
 use crate::ids::{object_id, person};
 use crate::zone::CustomZones;
@@ -21,6 +21,20 @@ pub struct Item {
     pub deleted: Option<Utc>,
 }
 
+/// What a partial delete (`This`, `ThisAndFollowing`) took away, so `restore` can give it back.
+#[derive(Clone, Debug)]
+pub struct Cut {
+    pub id: ObjectId,
+    pub recurrence_id: LocalDateTime,
+    /// Whether the cut was `ThisAndFollowing` (else `This`).
+    pub following: bool,
+    pub until: Utc,
+    /// The rules before the cut (`ThisAndFollowing` only).
+    pub recurrence: Vec<RecurrenceRule>,
+    /// The overrides the cut removed (`ThisAndFollowing` only).
+    pub overrides: Vec<Override>,
+}
+
 /// Everything the fake knows.
 #[derive(Debug)]
 pub struct State {
@@ -32,6 +46,8 @@ pub struct State {
     pub changes: Vec<Change>,
     pub customs: CustomZones,
     pub damaged: HashMap<ObjectId, String>,
+    /// Partial deletes that `restore` can still undo.
+    pub cuts: Vec<Cut>,
     /// The person who asks and who acts (`actor` in the log, `my_status` in instances).
     pub viewer: PersonRef,
 }
@@ -56,11 +72,12 @@ impl State {
             calendars: vec![cal(1, "Persönlich"), cal(2, "Arbeit")],
             items: BTreeMap::new(),
             next: 100,
-            now: Utc(1_794_816_000_000),
+            now: Utc::from_millis(1_794_816_000_000),
             history: Vec::new(),
             changes: Vec::new(),
             customs: CustomZones::new(),
             damaged: HashMap::new(),
+            cuts: Vec::new(),
             viewer: owner,
         }
     }

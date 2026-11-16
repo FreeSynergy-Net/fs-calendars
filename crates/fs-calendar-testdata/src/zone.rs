@@ -5,12 +5,13 @@
 
 use std::collections::HashMap;
 
-use chrono::{
-    Datelike, Duration, LocalResult, NaiveDate, NaiveDateTime, Offset, TimeZone, Timelike,
-};
+use chrono::{Duration, LocalResult, NaiveDate, NaiveDateTime, Offset, TimeZone, Timelike};
 use chrono_tz::Tz;
 
-use crate::draft::{Error, LocalDateTime, PlainDate, Problem, Result, Span, Utc, When, Zone};
+use crate::draft::{
+    BasicValue, Date, Error, LocalDateTime, Problem, Reference, Result, Span, Utc, When, Zone,
+    ZoneKind,
+};
 
 /// Custom zones (`/...`, from a `VTIMEZONE`): name to fixed offset in seconds east of UTC.
 pub type CustomZones = HashMap<String, i32>;
@@ -29,16 +30,44 @@ pub enum ZoneRule {
 /// # Errors
 /// `UnknownZone` when the name is neither an IANA zone nor a registered custom zone.
 pub fn resolve(zone: &Zone, customs: &CustomZones) -> Result<ZoneRule> {
-    match zone {
-        Zone::Iana(name) => name
+    let name = zone.id();
+    match zone.kind() {
+        ZoneKind::Iana => name
             .parse::<Tz>()
             .map(ZoneRule::Iana)
-            .map_err(|_| Error::UnknownZone(name.clone())),
-        Zone::Custom(name) => customs
+            .map_err(|_| Error::UnknownZone(name.to_owned())),
+        ZoneKind::Custom => customs
             .get(name)
             .map(|o| ZoneRule::Fixed(*o))
-            .ok_or_else(|| Error::UnknownZone(name.clone())),
+            .ok_or_else(|| Error::UnknownZone(name.to_owned())),
     }
+}
+
+/// An IANA-shaped zone; the name need not exist (`resolve` says `UnknownZone`).
+///
+/// # Panics
+/// On an empty name or one starting with `/` (a test-data mistake).
+#[must_use]
+pub fn iana(name: &str) -> Zone {
+    Zone::iana(name).expect("a zone name of the test data")
+}
+
+/// A custom zone (`/...`).
+///
+/// # Panics
+/// When the name does not start with `/` or is only that (a test-data mistake).
+#[must_use]
+pub fn custom(name: &str) -> Zone {
+    Zone::custom(name).expect("a custom zone name of the test data")
+}
+
+/// An absolute reference (`urn:...`, `https://...`).
+///
+/// # Panics
+/// When `text` is not absolute (a test-data mistake).
+#[must_use]
+pub fn reference(text: &str) -> Reference {
+    Reference::parse(text).expect("a reference of the test data")
 }
 
 impl ZoneRule {
@@ -63,49 +92,54 @@ impl ZoneRule {
     }
 }
 
-/// `PlainDate` to a calendar date, `None` if it does not exist.
+/// `Date` to a calendar date, `None` if it does not exist.
 #[must_use]
-pub fn naive_date(d: PlainDate) -> Option<NaiveDate> {
-    NaiveDate::from_ymd_opt(d.year, u32::from(d.month), u32::from(d.day))
+pub fn naive_date(d: Date) -> Option<NaiveDate> {
+    NaiveDate::parse_from_str(&d.canonical(), "%Y-%m-%d").ok()
 }
 
-/// A calendar date as `PlainDate`.
+/// A calendar date as `Date`.
 #[must_use]
-pub fn plain(d: NaiveDate) -> PlainDate {
-    PlainDate {
-        year: d.year(),
-        month: u8::try_from(d.month()).unwrap_or(1),
-        day: u8::try_from(d.day()).unwrap_or(1),
-    }
+pub fn plain(d: NaiveDate) -> Date {
+    Date::parse(&d.format("%Y-%m-%d").to_string()).unwrap_or_else(|_| epoch_date())
+}
+
+fn epoch_date() -> Date {
+    Date::parse("1970-01-01").unwrap_or_else(|_| unreachable!("a fixed valid date"))
 }
 
 /// `LocalDateTime` to a naive date-time, `None` if it does not exist.
 #[must_use]
 pub fn naive(l: LocalDateTime) -> Option<NaiveDateTime> {
-    naive_date(l.date)?.and_hms_opt(u32::from(l.hour), u32::from(l.minute), u32::from(l.second))
+    naive_date(l.date())?.and_hms_opt(
+        u32::from(l.hour()),
+        u32::from(l.minute()),
+        u32::from(l.second()),
+    )
 }
 
 /// A naive date-time as `LocalDateTime`.
 #[must_use]
 pub fn local(n: NaiveDateTime) -> LocalDateTime {
-    LocalDateTime {
-        date: plain(n.date()),
-        hour: u8::try_from(n.hour()).unwrap_or(0),
-        minute: u8::try_from(n.minute()).unwrap_or(0),
-        second: u8::try_from(n.second()).unwrap_or(0),
-    }
+    LocalDateTime::new(
+        plain(n.date()),
+        u8::try_from(n.hour()).unwrap_or(0),
+        u8::try_from(n.minute()).unwrap_or(0),
+        u8::try_from(n.second()).unwrap_or(0),
+    )
+    .unwrap_or_else(|_| unreachable!("hour, minute and second of a chrono time are in range"))
 }
 
 /// Milliseconds since the epoch of a naive UTC time.
 #[must_use]
 pub fn to_utc_ms(n: NaiveDateTime) -> Utc {
-    Utc(n.and_utc().timestamp_millis())
+    Utc::from_millis(n.and_utc().timestamp_millis())
 }
 
 /// A naive UTC time from milliseconds.
 #[must_use]
 pub fn from_utc_ms(u: Utc) -> NaiveDateTime {
-    chrono::DateTime::from_timestamp_millis(u.0)
+    chrono::DateTime::from_timestamp_millis(u.millis())
         .map_or(chrono::DateTime::UNIX_EPOCH.naive_utc(), |d| d.naive_utc())
 }
 
@@ -150,5 +184,5 @@ fn placed(rule: ZoneRule, start: LocalDateTime, length: Span) -> Result<(Utc, Ut
 
 fn end_of(rule: ZoneRule, start: NaiveDateTime, length: Span) -> Utc {
     let end_local = start + Duration::days(i64::from(length.days));
-    Utc(to_utc_ms(rule.to_utc(end_local)).0 + i64::from(length.seconds) * 1000)
+    Utc::from_millis(to_utc_ms(rule.to_utc(end_local)).millis() + i64::from(length.seconds) * 1000)
 }

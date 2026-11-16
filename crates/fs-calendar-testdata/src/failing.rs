@@ -6,8 +6,9 @@ use async_trait::async_trait;
 
 use crate::draft::{
     Answer, Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, AppointmentSummary,
-    Appointments, Busy, CalendarInfo, Capabilities, Change, Deleted, Error, HistoryEntry, Invitee,
-    ObjectId, Page, PersonRef, Place, Result, Revision, SeriesScope, Utc, When, Window, Zone,
+    Appointments, Attendee, Busy, CalendarInfo, Capabilities, Change, Deleted, Error, HistoryEntry,
+    Invitee, ObjectId, Page, PersonRef, Place, Result, Revision, SeriesScope, Utc, When, Window,
+    Zone,
 };
 
 /// Every method fails with `Error::Unavailable(reason)`.
@@ -97,7 +98,7 @@ impl Appointments for FailingAppointments {
     async fn delete(&self, _: ObjectId, _: Revision, _: SeriesScope) -> Result<Deleted> {
         self.fail()
     }
-    async fn restore(&self, _: ObjectId) -> Result<Appointment> {
+    async fn restore(&self, _: ObjectId, _: SeriesScope) -> Result<Appointment> {
         self.fail()
     }
     async fn invite(
@@ -112,6 +113,7 @@ impl Appointments for FailingAppointments {
     async fn respond(
         &self,
         _: ObjectId,
+        _: Revision,
         _: &PersonRef,
         _: Answer,
         _: Option<&str>,
@@ -120,7 +122,7 @@ impl Appointments for FailingAppointments {
     ) -> Result<Appointment> {
         self.fail()
     }
-    async fn free_busy(&self, _: &[PersonRef], _: Utc, _: Utc) -> Result<Vec<Busy>> {
+    async fn free_busy(&self, _: &[Attendee], _: Utc, _: Utc, _: &Zone) -> Result<Vec<Busy>> {
         self.fail()
     }
     async fn history(

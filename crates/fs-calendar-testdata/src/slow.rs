@@ -9,8 +9,9 @@ use async_trait::async_trait;
 
 use crate::draft::{
     Answer, Appointment, AppointmentDraft, AppointmentPatch, AppointmentQuery, AppointmentSummary,
-    Appointments, Busy, CalendarInfo, Capabilities, Change, Deleted, HistoryEntry, Invitee,
-    ObjectId, Page, PersonRef, Place, Result, Revision, SeriesScope, Utc, When, Window, Zone,
+    Appointments, Attendee, Busy, CalendarInfo, Capabilities, Change, Deleted, HistoryEntry,
+    Invitee, ObjectId, Page, PersonRef, Place, Result, Revision, SeriesScope, Utc, When, Window,
+    Zone,
 };
 
 /// `inner` with `delay` before every answer.
@@ -109,9 +110,9 @@ impl<A: Appointments> Appointments for SlowAppointments<A> {
         self.wait().await;
         self.inner.delete(id, expected, scope).await
     }
-    async fn restore(&self, id: ObjectId) -> Result<Appointment> {
+    async fn restore(&self, id: ObjectId, scope: SeriesScope) -> Result<Appointment> {
         self.wait().await;
-        self.inner.restore(id).await
+        self.inner.restore(id, scope).await
     }
     async fn invite(
         &self,
@@ -126,6 +127,7 @@ impl<A: Appointments> Appointments for SlowAppointments<A> {
     async fn respond(
         &self,
         id: ObjectId,
+        expected: Revision,
         who: &PersonRef,
         answer: Answer,
         comment: Option<&str>,
@@ -134,12 +136,18 @@ impl<A: Appointments> Appointments for SlowAppointments<A> {
     ) -> Result<Appointment> {
         self.wait().await;
         self.inner
-            .respond(id, who, answer, comment, proposal, scope)
+            .respond(id, expected, who, answer, comment, proposal, scope)
             .await
     }
-    async fn free_busy(&self, people: &[PersonRef], from: Utc, to: Utc) -> Result<Vec<Busy>> {
+    async fn free_busy(
+        &self,
+        people: &[Attendee],
+        from: Utc,
+        to: Utc,
+        view_zone: &Zone,
+    ) -> Result<Vec<Busy>> {
         self.wait().await;
-        self.inner.free_busy(people, from, to).await
+        self.inner.free_busy(people, from, to, view_zone).await
     }
     async fn history(
         &self,

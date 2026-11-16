@@ -28,7 +28,10 @@ async fn delete_this_makes_an_excluded_override() {
         )
         .await
         .unwrap();
-    assert_eq!(r.restorable_until, None);
+    assert!(
+        r.restorable_until.is_some(),
+        "a partial delete can be undone with restore"
+    );
     let now = f.get(a.id).await.unwrap().unwrap();
     assert!(now.overrides.iter().any(
         |o| o.recurrence_id == at(2026, 11, 16, 10, 0) && o.change == OverrideChange::Excluded

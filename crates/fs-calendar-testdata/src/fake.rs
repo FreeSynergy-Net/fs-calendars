@@ -8,15 +8,16 @@ use std::sync::{Mutex, MutexGuard};
 
 use crate::draft::{Appointment, ObjectId, PersonRef, Utc, Zone};
 use crate::state::{Item, State};
+use crate::zone;
 
 /// What the fake decided where the draft trait does not say (findings for the trait review).
 pub const DECISIONS: [&str; 8] = [
     "get/get_by_uid do not return a trashed appointment (None); list with include_deleted does.",
     "All-day and floating appointments are placed in the view zone passed to window; list, search and sorting use UTC as the view zone.",
     "A custom zone ('/...') is a fixed offset registered with with_custom_zone; its rules are not interpreted.",
-    "delete with This or ThisAndFollowing returns restorable_until = None: the trait has no way to undo a partial delete.",
+    "restore(id, scope) takes the scope of the delete: `This` removes the Excluded override, `ThisAndFollowing` gives back the rules and overrides; every delete returns restorable_until (30 days).",
     "Only daily, weekly, monthly and yearly rules (by_day, by_month_day, by_month, by_set_position, count, until) are expanded; others are Invalid.",
-    "respond has no `expected`: it writes against the current revision.",
+    "respond compares and sets against `expected` like every write; the trash and restore carry no `expected`.",
     "The acting person (log actor, my_status) is a property of the provider (`viewer`), not an argument.",
     "ThisAndFollowing on the first occurrence acts as Whole; otherwise the series splits (new uid, First/Next relations).",
 ];
@@ -96,7 +97,7 @@ impl FakeAppointments {
     /// The zone a test names, for readability.
     #[must_use]
     pub fn iana(name: &str) -> Zone {
-        Zone::Iana(name.to_owned())
+        zone::iana(name)
     }
 }
 

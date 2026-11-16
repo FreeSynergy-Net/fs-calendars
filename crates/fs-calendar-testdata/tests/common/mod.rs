@@ -12,7 +12,7 @@ pub fn utc(year: i32, month: u32, day: u32, hour: u32, minute: u32) -> Utc {
         .unwrap()
         .and_hms_opt(hour, minute, 0)
         .unwrap();
-    Utc(n.and_utc().timestamp_millis())
+    Utc::from_millis(n.and_utc().timestamp_millis())
 }
 
 pub fn loaded() -> (Sample, fs_calendar_testdata::FakeAppointments) {
@@ -26,11 +26,11 @@ pub async fn window(f: &impl Appointments, from: Utc, to: Utc) -> Window {
 }
 
 pub fn utc_zone() -> Zone {
-    Zone::Iana("UTC".to_owned())
+    fs_calendar_testdata::zone::iana("UTC")
 }
 
 pub async fn window_in(f: &impl Appointments, from: Utc, to: Utc, zone: &str) -> Window {
-    f.window(from, to, &Zone::Iana(zone.to_owned()), &[])
+    f.window(from, to, &fs_calendar_testdata::zone::iana(zone), &[])
         .await
         .unwrap()
 }

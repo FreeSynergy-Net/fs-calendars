@@ -4,13 +4,16 @@
 
 use crate::draft::{
     Appointment, AppointmentPatch, Frequency, NDay, Override, OverrideChange, Privacy, RuleEnd,
-    Utc, Weekday, When, Zone,
+    Utc, Weekday, When,
 };
 use crate::ids::object_id;
 use crate::sample::{all_day, at, rule, timed};
 use crate::state::blank;
+use crate::zone;
 
-const NOW: Utc = Utc(1_794_816_000_000);
+fn now() -> Utc {
+    Utc::from_millis(1_794_816_000_000)
+}
 
 pub(crate) struct Maker {
     pub(crate) n: u64,
@@ -33,7 +36,7 @@ impl Maker {
             format!("urn:fs-testdata:{slug}"),
             title,
             when,
-            NOW,
+            now(),
         );
         tweak(&mut a);
         self.out.push((slug, a));
@@ -108,12 +111,12 @@ fn singles(m: &mut Maker) {
         "Flug FRA-JFK",
         When::Timed {
             start: at(2026, 11, 25, 10, 30),
-            zone: Zone::Iana("Europe/Berlin".to_owned()),
+            zone: zone::iana("Europe/Berlin"),
             length: crate::draft::Span {
                 days: 0,
                 seconds: 8 * 3600 + 30 * 60,
             },
-            end_zone: Some(Zone::Iana("America/New_York".to_owned())),
+            end_zone: Some(zone::iana("America/New_York")),
             zone_assumed: false,
         },
         |_| {},
