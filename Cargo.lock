@@ -1579,6 +1579,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "fs-calendar-testdata",
+ "getrandom 0.3.4",
  "tokio",
  "turso",
 ]
