@@ -1498,7 +1498,7 @@ dependencies = [
  "fs-components-primitives",
  "fs-components-styles",
  "fs-components-widgets",
- "fs-types 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.2)",
+ "fs-types 0.0.1",
 ]
 
 [[package]]
@@ -1508,7 +1508,7 @@ dependencies = [
  "fs-calendar-app",
  "fs-calendar-cli",
  "fs-calendar-server",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
+ "fs-interfaces 0.0.22",
  "tempfile",
  "tokio",
 ]
@@ -1527,11 +1527,11 @@ dependencies = [
  "fs-components-fields",
  "fs-components-styles",
  "fs-components-widgets",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
+ "fs-interfaces 0.0.22",
  "fs-objects",
  "fs-tasks-core",
- "fs-types 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
- "fs-types 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.2)",
+ "fs-types 0.0.1",
+ "fs-types 0.0.22",
  "serde_json",
  "tempfile",
  "tokio",
@@ -1544,7 +1544,7 @@ dependencies = [
  "capnp",
  "fs-calendar-core",
  "fs-calendar-server",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
+ "fs-interfaces 0.0.22",
  "fs-objects",
  "serde_json",
  "tempfile",
@@ -1559,10 +1559,10 @@ dependencies = [
  "calcard",
  "capnp",
  "chrono",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
- "fs-jscalendar",
+ "fs-interfaces 0.0.22",
+ "fs-jscalendar 0.0.2",
  "fs-objects",
- "fs-types 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
+ "fs-types 0.0.22",
  "proptest",
  "rrule",
  "serde",
@@ -1579,7 +1579,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "fs-calendar-testdata",
- "fs-jscalendar",
+ "fs-jscalendar 0.0.2",
  "getrandom 0.3.4",
  "serde_json",
  "sha2",
@@ -1596,9 +1596,9 @@ dependencies = [
  "capnp-rpc",
  "chrono",
  "fs-calendar-core",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
+ "fs-interfaces 0.0.22",
  "fs-objects",
- "fs-types 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
+ "fs-types 0.0.22",
  "serde_json",
  "tempfile",
  "tokio",
@@ -1613,7 +1613,7 @@ dependencies = [
  "capnp",
  "chrono",
  "fs-calendar-core",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.1)",
+ "fs-interfaces 0.0.22",
  "fs-objects",
  "fs-tasks-core",
  "fs-tasks-server",
@@ -1739,7 +1739,16 @@ dependencies = [
 [[package]]
 name = "fs-interfaces"
 version = "0.0.1"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11#f8c87155bf5a90dd9f59a906ad6832d95c2c66b0"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.2#a8c28ea86f863db92f0d333fcf27b0d012fd8832"
+dependencies = [
+ "capnp",
+ "idna",
+]
+
+[[package]]
+name = "fs-interfaces"
+version = "0.0.22"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.22#7743056396ffa80bc77d3af9d1946229dd1f6155"
 dependencies = [
  "capnp",
  "capnp-rpc",
@@ -1751,15 +1760,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "uuid",
-]
-
-[[package]]
-name = "fs-interfaces"
-version = "0.0.1"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.2#a8c28ea86f863db92f0d333fcf27b0d012fd8832"
-dependencies = [
- "capnp",
- "idna",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1769,6 +1770,22 @@ source = "git+https://github.com/FreeSynergy/fs-jscalendar?tag=v0.0.1#7a3b402359
 dependencies = [
  "calcard",
  "chrono",
+ "jiff",
+ "jiff-tzdb",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
+name = "fs-jscalendar"
+version = "0.0.2"
+source = "git+https://github.com/FreeSynergy/fs-jscalendar?tag=v0.0.2#f3d651b73da2e440d24140df0bf4669a34c47cdc"
+dependencies = [
+ "calcard",
+ "chrono",
+ "fs-types 0.0.22",
  "jiff",
  "jiff-tzdb",
  "serde",
@@ -1804,7 +1821,7 @@ dependencies = [
  "capnp",
  "chrono",
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.1)",
- "fs-jscalendar",
+ "fs-jscalendar 0.0.1",
  "fs-objects",
  "serde",
  "serde_json",
@@ -1828,12 +1845,11 @@ dependencies = [
 [[package]]
 name = "fs-types"
 version = "0.0.1"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11#f8c87155bf5a90dd9f59a906ad6832d95c2c66b0"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.2#a8c28ea86f863db92f0d333fcf27b0d012fd8832"
 dependencies = [
  "capnp",
- "capnp-rpc",
  "chrono",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.11)",
+ "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.2)",
  "geo-uri",
  "iri-string",
  "oxilangtag",
@@ -1842,12 +1858,13 @@ dependencies = [
 
 [[package]]
 name = "fs-types"
-version = "0.0.1"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.2#a8c28ea86f863db92f0d333fcf27b0d012fd8832"
+version = "0.0.22"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.22#7743056396ffa80bc77d3af9d1946229dd1f6155"
 dependencies = [
  "capnp",
+ "capnp-rpc",
  "chrono",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.2)",
+ "fs-interfaces 0.0.22",
  "geo-uri",
  "iri-string",
  "oxilangtag",

@@ -14,10 +14,10 @@ fs-calendar-tasks = { path = "../fs-calendar-tasks", features = ["local"] }
 fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
 # Tasks belong to fs-tasks (ADR 0050); shown through the TaskItems interface. Tag-pinned on purpose.
 fs-tasks-core = { git = "https://github.com/FreeSynergy/fs-tasks", tag = "v0.0.1" }
-fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.11" }
+fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.22" }
 # TEMPORARY (DESIGN.md, "Temporary duplication"): the types the shipped admin frontend takes; see src/frontend_types.rs.
 fs-types-frontend = { package = "fs-types", git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.2" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.11", features = ["rpc"] }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.22", features = ["rpc"] }
 # One commit of branch thread-a-admin-frontend, untagged (DESIGN.md, "Pins"); all fs-components crates from the same commit.
 fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", rev = "9950b51" }
 fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", rev = "9950b51" }

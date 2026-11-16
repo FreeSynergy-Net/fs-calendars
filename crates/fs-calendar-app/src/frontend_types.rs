@@ -97,23 +97,24 @@ pub fn description(t: &new::TypeDescription) -> old::TypeDescription {
     out
 }
 
+/// Problems v0.0.22 adds (`BadTime`, `BadZone`, `BadId`, `BadVersion`, `OutOfRange`) go to the nearest old one.
 fn type_problem(p: new::TypeProblem) -> old::TypeProblem {
     use new::TypeProblem as N;
     use old::TypeProblem as O;
     match p {
         N::Empty => O::Empty,
         N::TooLong => O::TooLong,
-        N::Character | N::Contact(_) => O::Character,
+        N::Character | N::Contact(_) | N::BadZone | N::BadId | N::BadVersion => O::Character,
         N::BadLanguage => O::BadLanguage,
         N::BadUri => O::BadUri,
         N::UnsafeScheme => O::UnsafeScheme,
         N::NotAbsolute => O::NotAbsolute,
         N::BadDate => O::BadDate,
-        N::BadDateTime => O::BadDateTime,
+        N::BadDateTime | N::BadTime => O::BadDateTime,
         N::BadPlace => O::BadPlace,
         N::PlaceRange => O::PlaceRange,
         N::BadFingerprint => O::BadFingerprint,
-        N::NotInList => O::NotInList,
+        N::NotInList | N::OutOfRange => O::NotInList,
         N::NotImage => O::NotImage,
         N::BadKeyword => O::BadKeyword,
         N::NoParts => O::NoParts,
@@ -130,7 +131,9 @@ pub fn issue(i: &new::RecordIssue) -> old::RecordIssue {
         N::Missing => O::Missing,
         N::NotMultiple => O::NotMultiple,
         N::Value(p) => O::Value(type_problem(p)),
-        N::UnknownField | N::WrongType | N::NestedPath | N::DuplicatePath => O::UnknownField,
+        N::UnknownField | N::WrongType | N::NestedPath | N::ReadOnly | N::DuplicatePath => {
+            O::UnknownField
+        }
     };
     old::RecordIssue {
         field: i.field.clone(),

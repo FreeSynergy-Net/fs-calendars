@@ -35,6 +35,8 @@ pub fn serve_command(args: impl IntoIterator<Item = OsString>) -> i32 {
         data,
         actor,
         instance,
+        // The calendar shows only its own facet; `--facet` is not offered yet.
+        facet: _,
     } = options;
     let served = run_until_signal(&socket, || async move {
         let data = prepare_data_dir(&data)?;
