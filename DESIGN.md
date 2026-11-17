@@ -279,3 +279,7 @@ Still wanted in `fs-objects`:
 * The ICS export is as good as calcard's; vendor properties become `JSPROP` lines (RFC 9554 style) and are not understood by other clients.
 
 **Taken uid and conflicts (fs-tasks v0.9.0).** `Error::Exists(id)` (a task has the `uid`) is `Forwarded::Skipped` in `LocalTasks`; over RPC a `tasks/conflict` problem with the extension `id` is `Skipped`. Any other conflict (a UUID `uid` that is the id of an event in a shared store, `an object with id X exists`) is `Forwarded::Refused` for that task: it is not "already known" and is not stored. Tested through both adapters (`tests/local.rs`, `tests/rpc.rs`). Over RPC the tell is the extension `id`; an older server without it would make every conflict a refusal.
+
+## Sorting run S2b (2026-11-17, not compiled)
+
+The pure rules of the old window `fs-calendars-app` now also stand in `fs-calendars-core`: `src/shown_zone.rs` (which zone is shown: asked, `TZ`, `/etc/localtime`, UTC; final home would be `fs-jscalendar` `time`), `model/lists.rs` (list fields of a form over `locations`, `links`, `participants`), `model/search.rs` (`matches`, the `term` of `find`) and `recur/override_write.rs` (one instance changed or deleted as `recurrenceOverrides` entry, the counterpart of `recur/patch.rs`). Copies, not moves: `fs-calendars-app` stays untouched until the owner strikes it by script. Table with proofs and the strike list: `.scratch/katalog-plan/sortierung/calendars.md`.

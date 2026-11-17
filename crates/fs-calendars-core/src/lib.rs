@@ -35,6 +35,7 @@ pub mod model;
 pub mod recur;
 mod repo;
 mod revision;
+mod shown_zone;
 pub mod support;
 pub mod tasks;
 pub mod uid;
@@ -59,5 +60,6 @@ pub use repo::{
     IndexReport, Instance, Window,
 };
 pub use revision::Revision;
+pub use shown_zone::{shown_zone, zone_from};
 pub use tasks::{DueTask, Forwarded, TaskIntake, TasksError, TasksInWindow};
 pub use time::{Zone, ZoneSource, parse_utc as utc};

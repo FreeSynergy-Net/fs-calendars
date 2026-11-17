@@ -9,6 +9,7 @@ mod engine;
 mod expand;
 mod instance;
 mod occurrence;
+pub mod override_write;
 mod patch;
 mod rrule_engine;
 mod rrule_string;

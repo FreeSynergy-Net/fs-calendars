@@ -7,7 +7,9 @@
 mod bounded;
 mod counter;
 mod event;
+pub mod lists;
 mod marks;
+mod search;
 mod weight;
 
 pub use bounded::{Bounds, parse_bounded};
@@ -17,4 +19,5 @@ pub use fs_jscalendar::model::{
     VERSION,
 };
 pub use marks::{SENSITIVE_KEY, UNCLEAR_SENSITIVE, sensitive_categories_of};
+pub use search::matches;
 pub use weight::{Shape, memory_weight, shape};
