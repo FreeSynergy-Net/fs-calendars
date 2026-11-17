@@ -1,10 +1,11 @@
 //! `fs-calendars`: the one program of FreeSynergy.Calendars (ADR 0063).
 //!
 //! Pattern: Command — the first word picks the subcommand and each one is a library of its own:
-//! `serve` (`fs-calendars-server`), `app` or no word at all (the window: not available until the port, a message with exit
-//! code 2), anything else is a command of the command line (`fs-calendars-cli`).
+//! `serve` (`fs-calendars-server`), `app` or no word at all (the window: the frontend `simple`, started as a process of its own), anything else is a command of the command line (`fs-calendars-cli`).
 
 use std::ffi::OsString;
+
+mod starter;
 
 fn main() {
     let words: Vec<String> = std::env::args().skip(1).collect();
@@ -27,13 +28,7 @@ fn dispatch(words: &[String]) -> i32 {
     }
 }
 
-/// The window is not in this version: it is being ported to the new frontend library (DESIGN.md, "Admin window").
-/// Say so in both languages, with the way on, and refuse with the usage exit code 2.
-fn window(_args: &[String]) -> i32 {
-    eprintln!("{WINDOW_UNAVAILABLE_DE}");
-    eprintln!("{WINDOW_UNAVAILABLE_EN}");
-    2
+/// The window: the frontend `simple` next to this program (see `starter`).
+fn window(args: &[String]) -> i32 {
+    starter::open(args)
 }
-
-const WINDOW_UNAVAILABLE_DE: &str = "fs-calendars: Die Kalender-Oberfläche ist in dieser Version noch nicht verfügbar (sie wird gerade auf die neue Oberflächen-Bibliothek umgestellt). Nutze bis dahin die Kommandos `fs-calendars --help` (Terminal) bzw. den Server (`fs-calendars serve`).";
-const WINDOW_UNAVAILABLE_EN: &str = "fs-calendars: The calendar window is not available in this version yet (it is being moved to the new frontend library). Until then use the commands of `fs-calendars --help` (terminal) or the server (`fs-calendars serve`).";

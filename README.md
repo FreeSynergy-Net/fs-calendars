@@ -8,7 +8,7 @@ What is different here: events follow the open JSCalendar standard (RFC 8984), a
 
 ## What it can do today
 
-Latest tag: `v0.0.2`; branch `r1-admin` is the next version (0.0.3, not tagged).
+Latest tag: `v0.0.4`; the next version `v0.0.5` brings the window back (see below).
 
 - Create, edit, delete and list events; find what happens in a time range.
 - Repeating events (daily to yearly, "second Tuesday", count or until), with single occurrences changed, removed or added.
@@ -19,18 +19,21 @@ Latest tag: `v0.0.2`; branch `r1-admin` is the next version (0.0.3, not tagged).
 - Tell other programs when an event changes.
 - Events marked sensitive are left out of exports unless released by name.
 - A small server for all of this over a local socket.
-- A window with the month, week and day grid and a list and forms made from the description of `Event` (create, change, delete, search, invite, respond, history, check, import, export). Commands that are not there yet are listed in the description as not supported.
+- A window (`fs-calendars`, the frontend `fs-calendars-simple`) with your calendars on the left, a large title with the shown range, Previous / Today / Next, and the month, the week, the day or the agenda. It shows **example data marked as a preview**: no server delivers appointments to it yet, and every menu entry says "coming soon". `fs-calendars-simple --picture FILE` draws it to a picture.
 - A type description of `Event` that the server hands out (`Events.types`), so any generated frontend can use it.
 
 ## What is not there yet
 
-- The window cannot yet edit repeat rules or single occurrences, set alerts, or show several calendars. No dragging. A typed sentence, several time zones side by side, free-slot links, booking pages, placing tasks into free time and flexible blocks are listed as "not yet" and answer so.
-- The window reads the data directly instead of talking to the server.
+- The window shows no real appointment yet (preview data only), cannot create or change anything, has no tick boxes for calendars, no mini calendar, no keys. Series dialog, editor, import and export in the window, search: planned (see DESIGN, "Window `fs-calendars-simple`").
 - The calendar server is not yet connected to a task server, so tasks found in an imported file are reported as not imported.
 - No CalDAV, no sending invitations by e-mail (iTIP), no free/busy calculation.
 - Importing is slow for large files (about 45 seconds for 4,000 events).
 - Some late corrections to the core have been tested but not yet reviewed by a second reader. The DESIGN file says which.
 - The interface is a draft and has no consumer yet.
+
+## Auf Deutsch
+
+FreeSynergy Calendars hält deine Termine, auch die, die sich wiederholen, mit der richtigen Zeitzone und zeigt sie als Monat, Woche, Tag oder Terminübersicht. Heute gibt es: Kern und Server (Termine, Serien, Einladungen, Import und Export iCalendar und JSCalendar) und ein **Fenster** (`fs-calendars`, das Frontend `fs-calendars-simple`) mit deinen Kalendern links, großem Titel mit dem gezeigten Zeitraum, Zurück / Heute / Vor und den Ansichten. Das Fenster zeigt noch **Beispieldaten, als Vorschau markiert**: kein Server liefert ihm Termine, und jeder Menüpunkt sagt „kommt noch“. Noch nicht da: echte Termine im Fenster, Anlegen und Ändern, Serien-Dialog, Häkchen je Kalender, Minikalender, Tasten, CalDAV.
 
 ## Part of FreeSynergy
 

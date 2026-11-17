@@ -1,7 +1,7 @@
 name: release
-# No calendar release until the window is ported (DESIGN.md "Admin window", see A): the tag trigger is off, the job
-# runs only by hand. Restore `push: { tags: ["v*"] }` with the port.
+# Release of FreeSynergy Calendars on a version tag (fs-release caller, pinned). The window is back with v0.0.5: the tag trigger is on again.
 on:
+  push: { tags: ["v*"] }
   workflow_dispatch:
 permissions:
   contents: write
@@ -10,9 +10,10 @@ permissions:
   packages: write
 jobs:
   release:
-    uses: FreeSynergy/fs-release/.github/workflows/release.yml@main
+    uses: FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.10
     with:
-      binaries: fs-calendars
+      # `fs-calendars` holds the server (`fs-calendars serve`), the command line and the starter; `fs-calendars-simple` is the frontend process.
+      binaries: fs-calendars,fs-calendars-simple
       cargo-package: fs-calendars
       name: fs-calendars
       kind: app

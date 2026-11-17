@@ -2,7 +2,7 @@
 resolver = "2"
 # Until the port, see DESIGN.md "Admin window": the app has its own Cargo.lock and old fs-components pin.
 exclude = ["crates/fs-calendars-app"]
-members = ["crates/fs-calendars-core", "crates/fs-calendars-server", "crates/fs-calendars-tasks", "crates/fs-calendars-cli", "crates/fs-calendars", "crates/fs-calendars-testdata", "crates/fs-calendars-local"]
+members = ["crates/fs-calendars-core", "crates/fs-calendars-server", "crates/fs-calendars-tasks", "crates/fs-calendars-cli", "crates/fs-calendars", "crates/fs-calendars-testdata", "crates/fs-calendars-local", "crates/fs-calendars-simple"]
 
 [workspace.package]
 authors = ["FreeSynergy <support@freesynergy.net>"]

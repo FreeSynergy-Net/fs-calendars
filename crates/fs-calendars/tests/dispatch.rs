@@ -48,21 +48,64 @@ fn a_command_reaches_a_missing_server_with_exit_1() {
     assert!(err.contains("fs-calendars:"), "{err}");
 }
 
+// A copy of the program in a folder of its own, with or without a frontend next to it. Writing and starting executables
+// in several threads gives "text file busy" (ETXTBSY), so the tests of the starter take this lock and close every file first.
+static ONE_COPY_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn copy_with(frontend: Option<&str>) -> (tempfile::TempDir, std::path::PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let exe = dir.path().join("fs-calendars");
+    std::fs::copy(env!("CARGO_BIN_EXE_fs-calendars"), &exe).unwrap();
+    if let Some(script) = frontend {
+        let path = dir.path().join("fs-calendars-simple");
+        std::fs::write(&path, script).unwrap();
+        std::fs::File::open(&path).unwrap().sync_all().unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    (dir, exe)
+}
+
 #[test]
-fn the_window_is_not_available_says_so_in_german_and_english_with_the_way_on() {
+fn a_missing_window_is_said_in_german_and_english_and_ends_with_1() {
+    let _one = ONE_COPY_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let (_dir, exe) = copy_with(None);
     for args in [&["app"][..], &[][..], &["app", "--x"][..]] {
-        let (code, out, err) = run(args);
-        assert_eq!(code, Some(2), "{args:?}");
-        assert!(out.is_empty(), "{out}");
-        for word in [
-            "noch nicht verfügbar",
-            "not available in this version yet",
-            "fs-calendars --help",
-            "fs-calendars serve",
-        ] {
+        let out = Command::new(&exe).args(args).output().unwrap();
+        assert_eq!(out.status.code(), Some(1), "{args:?}");
+        assert!(out.stdout.is_empty());
+        let err = String::from_utf8_lossy(&out.stderr);
+        for word in ["nicht gefunden", "was not found", "fs-calendars-simple"] {
             assert!(err.contains(word), "{word} missing in {err}");
         }
     }
+}
+
+#[test]
+fn the_window_is_the_frontend_next_to_the_program_with_the_words_and_its_exit_code() {
+    let _one = ONE_COPY_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let (_dir, exe) = copy_with(Some("#!/bin/sh\necho \"words: $*\"\nexit 7\n"));
+    let out = Command::new(&exe)
+        .args(["app", "--view", "week"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(7),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    // after `app` the words go on; without a word the frontend gets none
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        "words: --view week"
+    );
+    let bare = Command::new(&exe).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&bare.stdout).trim(), "words:");
 }
 
 #[test]
