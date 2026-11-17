@@ -25,6 +25,7 @@ mod state;
 mod window;
 mod words;
 
+pub use bar::arrow;
 pub use cli::{Command, HELP, Options, SCREENS, parse};
 pub use content::{COMING, START, coming, start};
 pub use context::{KIND, WORDS, commands, items as context_items};
@@ -32,7 +33,8 @@ pub use filter::{Notice, notice, visible};
 pub use main_view::Main;
 pub use names::{german, names, title};
 pub use preview::{
-    CALENDARS, CAPABILITY, Calendar, ENTRIES, Entry, ID_PREFIX, Item, Mode, items, mode,
+    CALENDARS, CAPABILITY, Calendar, DOT_STYLES, ENTRIES, Entry, ID_PREFIX, Item, Mode, dot_class,
+    items, mode,
 };
 pub use run::{clock_now, clock_of, run};
 pub use state::{RANGES, Shared, State, Step, range_key, range_of};

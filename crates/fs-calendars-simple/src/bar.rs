@@ -7,10 +7,12 @@ use fs_components::blinc::cn::cn;
 use fs_components::blinc::cn::components::button::ButtonVariant;
 use fs_components::blinc::core::BlincContextState;
 use fs_components::blinc::layout::div::{Div, div};
+use fs_components::blinc::layout::prelude::text;
 use fs_components_fields::controls::Segmented;
 use fs_components_widgets::{Block, Element, Inline, TextView};
 
 use crate::labels::Labels;
+use crate::preview::dot_class;
 use crate::state::{RANGES, Shared, Step, range_key, range_of};
 
 /// Ask the window to draw the surface again (nothing to do outside a window).
@@ -22,20 +24,37 @@ pub fn redraw() {
 
 fn button<F: Fn() + Send + Sync + 'static>(
     label: &str,
+    help: &str,
     id: &str,
     variant: ButtonVariant,
     on: F,
 ) -> impl Element + use<F> {
-    cn::button(label.to_owned())
+    let inner = cn::button(label.to_owned())
         .variant(variant)
         .on_click(move |_| on())
         .build_component()
-        .id(id)
+        .id(id);
+    // The word of an arrow stays as its help text (reading aloud and tooltip), also when the button shows a sign only.
+    div()
+        .attr("aria-label", help)
+        .attr("title", help)
+        .child(inner)
 }
 
-fn step_button(shared: &Shared, label: &str, id: &str, step: Step) -> impl Element + use<> {
+/// The text on a step button: an arrow for back and on, the word for today. The word of an arrow stays as its help text.
+#[must_use]
+pub const fn arrow(step: Step) -> Option<&'static str> {
+    match step {
+        Step::Previous => Some("\u{2039}"),
+        Step::Next => Some("\u{203A}"),
+        Step::Today => None,
+    }
+}
+
+fn step_button(shared: &Shared, word: &str, id: &str, step: Step) -> impl Element + use<> {
     let shared = shared.clone();
-    button(label, id, ButtonVariant::Secondary, move || {
+    let shown = arrow(step).unwrap_or(word);
+    button(shown, word, id, ButtonVariant::Outline, move || {
         shared.lock().step(step);
         redraw();
     })
@@ -61,6 +80,32 @@ fn views(shared: &Shared, labels: &Labels) -> Segmented {
     });
     group.set(range_key(shared.lock().range));
     group
+}
+
+/// The legend: a dot in the colour of each calendar, then its name.
+pub fn legend(labels: &Labels) -> Div {
+    let mut row = div()
+        .id("cal-legend")
+        .flex_row()
+        .items_center()
+        .gap_px(18.0)
+        .w_full();
+    for (category, name) in &labels.calendars {
+        let dot = div()
+            .class("fs-cal-dot")
+            .class(dot_class(*category))
+            .w(12.0)
+            .h(12.0);
+        row = row.child(
+            div()
+                .flex_row()
+                .items_center()
+                .gap_px(6.0)
+                .child(dot)
+                .child(text(name.as_str()).size(13.0)),
+        );
+    }
+    row
 }
 
 /// The line: `title` at the left, the steps and the view choice at the right.
@@ -91,4 +136,17 @@ pub fn bar(shared: &Shared, labels: &Labels, title: &str) -> Div {
         .child(div().flex_grow_value(1.0).child(title))
         .child(steps)
         .child(views(shared, labels).build())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::arrow;
+    use crate::state::Step;
+
+    #[test]
+    fn back_and_on_are_arrows_and_today_keeps_its_word() {
+        assert_eq!(arrow(Step::Previous), Some("\u{2039}"));
+        assert_eq!(arrow(Step::Next), Some("\u{203A}"));
+        assert_eq!(arrow(Step::Today), None);
+    }
 }

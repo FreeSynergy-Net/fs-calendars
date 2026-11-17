@@ -22,7 +22,7 @@ use fs_components_widgets::{
     styles,
 };
 
-use crate::bar::{bar, redraw};
+use crate::bar::{bar, legend, redraw};
 use crate::context::{KIND, items as context_items, say, words as context_words};
 use crate::filter::{Notice, notice, visible};
 use crate::labels::Labels;
@@ -33,7 +33,7 @@ use crate::state::{Shared, State};
 /// Padding of the page in pixels (Blinc counts padding in units of 4 px).
 const PAD: f32 = 16.0;
 /// What the title line needs; the notice and the calendar get the rest.
-const BAR_HEIGHT: f32 = 64.0;
+const BAR_HEIGHT: f32 = 64.0 + 28.0;
 /// What the notice needs, with its gap.
 const NOTICE_HEIGHT: f32 = 104.0;
 
@@ -229,7 +229,9 @@ impl Surface for Main {
             .p(PAD / 4.0)
             .w(width)
             .h(height);
-        page = page.child(bar(&self.shared, &self.labels, &self.title()));
+        page = page
+            .child(bar(&self.shared, &self.labels, &self.title()))
+            .child(legend(&self.labels));
         if let Some(kind) = marker {
             page = page.child(self.marker(kind));
         }
@@ -241,6 +243,11 @@ impl Surface for Main {
     }
 
     fn styles(&self) -> String {
-        format!("{}{}", styles(), fs_components_fields::controls::STYLES)
+        format!(
+            "{}{}{}",
+            styles(),
+            fs_components_fields::controls::STYLES,
+            crate::preview::DOT_STYLES
+        )
     }
 }

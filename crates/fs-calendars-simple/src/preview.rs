@@ -47,6 +47,24 @@ pub struct Calendar {
     pub category: u8,
 }
 
+/// The style of the coloured dot before a calendar in the legend: the status colour of its category, the same as the appointment
+/// blocks (`fs-calendar-item-cN` of fs-components), so a dot and its blocks always have one colour.
+pub const DOT_STYLES: &str = r"
+.fs-cal-dot-c0 { background: var(--success); }
+.fs-cal-dot-c1 { background: var(--info); }
+.fs-cal-dot-c2 { background: var(--border-hover); }
+.fs-cal-dot-c3 { background: var(--warning); }
+.fs-cal-dot-c4 { background: var(--error); }
+.fs-cal-dot-c5 { background: var(--accent); }
+.fs-cal-dot { border-radius: 6px; }
+";
+
+/// The class of the dot of a calendar with this colour category.
+#[must_use]
+pub fn dot_class(category: u8) -> String {
+    format!("fs-cal-dot-c{}", category % 6)
+}
+
 /// The four example calendars, in the order of the navigation.
 pub const CALENDARS: [Calendar; 4] = [
     Calendar {
@@ -186,6 +204,25 @@ pub fn items(texts: &Mf2Texts, today: Day) -> Vec<Item> {
 
 #[cfg(test)]
 mod tests {
+    use super::{DOT_STYLES, dot_class};
+
+    #[test]
+    fn every_calendar_has_a_dot_of_its_own_colour() {
+        // the dot of a calendar and the blocks of its appointments use the same category, and the style gives it the colour of
+        // the block (success, info, warning, error)
+        let want = [
+            (0, "--success"),
+            (1, "--info"),
+            (4, "--error"),
+            (3, "--warning"),
+        ];
+        for (c, (category, var)) in super::CALENDARS.iter().zip(want) {
+            assert_eq!(c.category, category, "{}", c.id);
+            let rule = format!(".{} {{ background: var({var}); }}", dot_class(c.category));
+            assert!(DOT_STYLES.contains(&rule), "{rule}");
+        }
+    }
+
     use super::{CALENDARS, ENTRIES, Mode, items, mode};
     use crate::words::words;
     use fs_components_widgets::Day;

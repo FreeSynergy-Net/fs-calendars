@@ -120,7 +120,7 @@ pub fn app(
     for c in CALENDARS {
         screens.push(Screen::new(
             c.id,
-            format!("\u{25CF}  {}", say(c.word)),
+            format!("   {}", say(c.word)),
             Arc::new(main.sibling(Some(c.id))),
         ));
     }

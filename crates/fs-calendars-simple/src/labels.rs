@@ -14,6 +14,7 @@ pub struct Labels {
     pub(crate) week: String,
     pub(crate) day: String,
     pub(crate) agenda: String,
+    pub(crate) calendars: Vec<(u8, String)>,
     pub(crate) agenda_from: String,
     pub(crate) preview_title: String,
     pub(crate) preview_text: String,
@@ -37,6 +38,10 @@ impl Labels {
             week: p("range-week"),
             day: p("range-day"),
             agenda: p("range-agenda"),
+            calendars: crate::preview::CALENDARS
+                .iter()
+                .map(|c| (c.category, p(c.word)))
+                .collect(),
             agenda_from: p("agenda-from"),
             preview_title: p("preview-title"),
             preview_text: p("preview-text"),
