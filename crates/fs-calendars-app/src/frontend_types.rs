@@ -98,6 +98,9 @@ pub fn description(t: &new::TypeDescription) -> old::TypeDescription {
 }
 
 /// Problems v0.0.22 adds (`BadTime`, `BadZone`, `BadId`, `BadVersion`, `OutOfRange`) go to the nearest old one.
+/// `TypeProblem` is `non_exhaustive` (fs-types v0.0.3): a problem this file does not know yet is shown as `Character`
+/// (the same code the backend uses for an unclassified problem, `backend/errors.rs` `problem_for`), never as a sentence.
+#[allow(unreachable_patterns)] // before the pin reaches fs-types v0.0.3 the enum is closed and the arm is unreachable
 fn type_problem(p: new::TypeProblem) -> old::TypeProblem {
     use new::TypeProblem as N;
     use old::TypeProblem as O;
@@ -119,6 +122,7 @@ fn type_problem(p: new::TypeProblem) -> old::TypeProblem {
         N::BadKeyword => O::BadKeyword,
         N::NoParts => O::NoParts,
         N::BadCountryCode => O::BadCountryCode,
+        _ => O::Character,
     }
 }
 
@@ -149,5 +153,26 @@ pub fn unknown_field(name: &str) -> old::RecordIssue {
         field: name.to_owned(),
         index: 0,
         problem: old::RecordProblem::UnknownField,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn known_problems_keep_their_code() {
+        assert!(matches!(
+            type_problem(new::TypeProblem::Empty),
+            old::TypeProblem::Empty
+        ));
+        assert!(matches!(
+            type_problem(new::TypeProblem::BadZone),
+            old::TypeProblem::Character
+        ));
+        assert!(matches!(
+            type_problem(new::TypeProblem::OutOfRange),
+            old::TypeProblem::NotInList
+        ));
     }
 }
