@@ -14,6 +14,7 @@ use fs_components_widgets::{Block, Day, Inline, Moment, TextView, ViewRange, sty
 use crate::content::{coming, start};
 use crate::main_view::Main;
 use crate::preview::{CALENDARS, Mode};
+use crate::state::Step;
 
 /// The icon of the program, embedded in the binary.
 const ICON: &[u8] = include_bytes!("../assets/fs-calendars.png");
@@ -134,6 +135,9 @@ pub fn app(
         page(false, coming(texts)),
     ));
     let widget = AppWidget::new(title, screens)?;
+    // The context menu opens on the shell; "Today" is the one command that works.
+    let _ = main.shell().set(widget.clone());
+    let shared = main.shared().clone();
     let soon = say("soon");
     let locked = |id: &str| {
         MenuEntry::new(id, format!("{} ({soon})", say(&format!("menu-{id}")))).disabled()
@@ -143,7 +147,12 @@ pub fn app(
             say("menu-program"),
             vec![locked("new"), locked("search"), locked("import")],
         )],
-        |_| {},
+        move |id| {
+            if id == "today" {
+                shared.lock().step(Step::Today);
+                crate::bar::redraw();
+            }
+        },
     )?;
     widget.set_status(Some(Status::Info(say("status-ready"))));
     Ok(widget)

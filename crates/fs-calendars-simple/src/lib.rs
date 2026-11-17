@@ -14,6 +14,7 @@
 mod bar;
 mod cli;
 mod content;
+mod context;
 mod filter;
 mod labels;
 mod main_view;
@@ -26,6 +27,7 @@ mod words;
 
 pub use cli::{Command, HELP, Options, SCREENS, parse};
 pub use content::{COMING, START, coming, start};
+pub use context::{KIND, WORDS, commands, items as context_items};
 pub use filter::{Notice, notice, visible};
 pub use main_view::Main;
 pub use names::{german, names, title};

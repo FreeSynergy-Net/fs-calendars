@@ -62,7 +62,7 @@ pub const CALENDARS: [Calendar; 4] = [
     Calendar {
         id: "family",
         word: "screen-family",
-        category: 2,
+        category: 4,
     },
     Calendar {
         id: "holidays",

@@ -7,7 +7,7 @@ members = ["crates/fs-calendars-core", "crates/fs-calendars-server", "crates/fs-
 [workspace.package]
 authors = ["FreeSynergy <support@freesynergy.net>"]
 repository = "https://github.com/FreeSynergy/fs-calendars"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.85"

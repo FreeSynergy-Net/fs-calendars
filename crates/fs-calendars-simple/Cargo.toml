@@ -19,12 +19,13 @@ path = "src/main.rs"
 
 [dependencies]
 # One tag of fs-components for everything; Blinc comes only through it (`fs_components::blinc`), never as a dependency here.
-# v0.0.24 on purpose: the one tag whose `fs-types` comes from the same source as the core of this workspace (fs-interfaces v0.0.22).
-fs-components = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.24" }
-fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.24" }
-fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.24" }
-fs-components-widgets = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.24" }
-fs-components-mf2 = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.24" }
-fs-components-words = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.24" }
+# v0.0.28: context menu (M3) and the command model; its `fs-types` comes from the repository fs-types (V1+), the core of this workspace
+# still from fs-interfaces v0.0.22 (two sources of the name until the V1+ lift of the core; this crate uses neither).
+fs-components = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.28" }
+fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.28" }
+fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.28" }
+fs-components-widgets = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.28" }
+fs-components-mf2 = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.28" }
+fs-components-words = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.28" }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 base64 = "0.22"

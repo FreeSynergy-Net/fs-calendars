@@ -75,7 +75,7 @@ fn a_missing_window_is_said_in_german_and_english_and_ends_with_1() {
     for args in [&["app"][..], &[][..], &["app", "--x"][..]] {
         let out = Command::new(&exe).args(args).output().unwrap();
         assert_eq!(out.status.code(), Some(1), "{args:?}");
-        assert!(out.stdout.is_empty());
+        assert_eq!(out.stdout, Vec::<u8>::new());
         let err = String::from_utf8_lossy(&out.stderr);
         for word in ["nicht gefunden", "was not found", "fs-calendars-simple"] {
             assert!(err.contains(word), "{word} missing in {err}");

@@ -23,6 +23,7 @@ fn every_list_entry_and_name_exists_in_both_languages() {
         ids.extend((1..=7).map(|n| format!("weekday-{n}")));
         ids.extend((1..=12).map(|n| format!("month-{n}")));
         ids.extend((1..=16).map(|n| format!("example-{n}")));
+        ids.extend(fs_calendars_simple::WORDS.iter().map(|w| (*w).to_owned()));
         for id in ids {
             let said = texts.plain(&id);
             assert!(!said.is_empty() && said != id, "{id} is missing: {said:?}");

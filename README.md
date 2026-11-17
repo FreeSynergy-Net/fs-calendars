@@ -8,7 +8,7 @@ What is different here: events follow the open JSCalendar standard (RFC 8984), a
 
 ## What it can do today
 
-Latest tag: `v0.0.4`; the next version `v0.0.5` brings the window back (see below).
+Latest tag: `v0.0.5` brings the window back (see below).
 
 - Create, edit, delete and list events; find what happens in a time range.
 - Repeating events (daily to yearly, "second Tuesday", count or until), with single occurrences changed, removed or added.

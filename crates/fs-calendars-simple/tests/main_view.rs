@@ -77,6 +77,14 @@ fn the_screens_share_the_range_and_the_day() {
 }
 
 #[test]
+fn the_agenda_title_names_its_first_day_and_the_month_title_the_month() {
+    let view = main_view(&[], true);
+    assert_eq!(view.title(), "November 2026");
+    view.shared().lock().range = ViewRange::Agenda;
+    assert_eq!(view.title(), "from 18 November 2026");
+}
+
+#[test]
 fn example_data_stand_only_in_preview_rs() {
     let id = ["preview", ":"].concat();
     let name = ["Example", " A"].concat();

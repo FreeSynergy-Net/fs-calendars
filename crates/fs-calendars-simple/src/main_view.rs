@@ -10,10 +10,11 @@
 //! Pattern: Adapter (our items in, blocks of the shell out) + State (`state.rs`: range, day and example switch live outside the
 //! element and are shared by all screens, because a surface is built again at every change).
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use fs_components::blinc::layout::div::div;
-use fs_components_app::Surface;
+use fs_components_app::commands::{KeyNames, Platform, Resolved, Target, TextKey};
+use fs_components_app::{AppWidget, ModelTexts, Surface, context_trigger};
 use fs_components_mf2::Mf2Texts;
 use fs_components_widgets::states::{Alert, EmptyState, Severity};
 use fs_components_widgets::{
@@ -22,6 +23,7 @@ use fs_components_widgets::{
 };
 
 use crate::bar::{bar, redraw};
+use crate::context::{KIND, items as context_items, say, words as context_words};
 use crate::filter::{Notice, notice, visible};
 use crate::labels::Labels;
 use crate::names::{german, names, title};
@@ -45,6 +47,9 @@ pub struct Main {
     pub(crate) calendar: Option<&'static str>,
     pub(crate) shared: Shared,
     pub(crate) dot: bool,
+    pub(crate) shell: Arc<OnceLock<AppWidget>>,
+    pub(crate) menu: Arc<Vec<Resolved>>,
+    pub(crate) menu_words: Arc<std::collections::HashMap<String, String>>,
 }
 
 impl Main {
@@ -69,6 +74,9 @@ impl Main {
             calendar: None,
             shared: Shared::new(state),
             dot: german(texts),
+            shell: Arc::new(OnceLock::new()),
+            menu: Arc::new(context_items()),
+            menu_words: context_words(texts),
         }
     }
 
@@ -84,6 +92,9 @@ impl Main {
             calendar,
             shared: self.shared.clone(),
             dot: self.dot,
+            shell: Arc::clone(&self.shell),
+            menu: Arc::clone(&self.menu),
+            menu_words: Arc::clone(&self.menu_words),
         }
     }
 
@@ -91,6 +102,12 @@ impl Main {
     #[must_use]
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+
+    /// The cell the window puts its shell into, so the context menu can open on it.
+    #[must_use]
+    pub fn shell(&self) -> &Arc<OnceLock<AppWidget>> {
+        &self.shell
     }
 
     /// The shared state of the window.
@@ -120,6 +137,13 @@ impl Main {
     #[must_use]
     pub fn title(&self) -> String {
         let s = self.shared.snapshot();
+        if s.range == ViewRange::Agenda {
+            // The agenda runs on for thirty days: "from 18 November 2026" says it shorter than the whole span.
+            let point = if self.dot { "." } else { "" };
+            let (day, year) = (s.anchor.day(), s.anchor.year());
+            let month = self.names.month_of(s.anchor);
+            return format!("{} {day}{point} {month} {year}", self.labels.agenda_from);
+        }
         title(s.range, s.anchor, 0, &self.names, self.dot)
     }
 
@@ -158,7 +182,13 @@ impl Main {
             }
             redraw();
         });
-        CalendarView::new(s.range, s.anchor, Arc::clone(&self.names), Arc::new(items))
+        let (shell, menu, menu_words) = (
+            Arc::clone(&self.shell),
+            Arc::clone(&self.menu),
+            Arc::clone(&self.menu_words),
+        );
+        let chosen: Vec<String> = s.chosen.iter().cloned().collect();
+        let view = CalendarView::new(s.range, s.anchor, Arc::clone(&self.names), Arc::new(items))
             .now(self.now)
             .today(s.today)
             .selected_item(s.chosen)
@@ -166,7 +196,23 @@ impl Main {
             .position(self.shared.position())
             .start_hour(7)
             .on_pick(on_pick)
-            .build(size.0, size.1)
+            .build(size.0, size.1);
+        // Right click, the menu key and Shift+F10 open the menu of the calendar; the target is the chosen appointment, if any.
+        context_trigger(div().w(size.0).h(size.1).child(view), move |trigger| {
+            let Some(app) = shell.get() else { return };
+            let target = Target {
+                kind: KIND.to_owned(),
+                ids: chosen.clone(),
+            };
+            let (names, words) = (KeyNames::english(), Arc::clone(&menu_words));
+            let say = move |key: &TextKey| say(&words, key);
+            let texts = ModelTexts {
+                say: &say,
+                platform: Platform::current(),
+                names: &names,
+            };
+            app.open_context_menu(&trigger, target, &menu, &texts);
+        })
     }
 }
 

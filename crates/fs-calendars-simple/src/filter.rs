@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn real_mode_and_a_hidden_example_show_no_example_item() {
         let all = list();
-        assert!(visible(Mode::Live, true, &all, None).is_empty());
-        assert!(visible(Mode::Preview, false, &all, None).is_empty());
+        assert_eq!(visible(Mode::Live, true, &all, None), vec![]);
+        assert_eq!(visible(Mode::Preview, false, &all, None), vec![]);
     }
 }
