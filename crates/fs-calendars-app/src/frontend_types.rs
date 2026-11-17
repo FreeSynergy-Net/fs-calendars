@@ -29,6 +29,10 @@ fn basic(b: new::BasicType) -> old::BasicType {
         N::Choice => O::Choice,
         N::Keywords => O::Keywords,
         N::Reference => O::Reference,
+        // fs-types v0.0.3 adds integer, duration, flag, whole (types_capnp.rs:28-31); the old frontend (v0.0.2) has no
+        // such field. QUESTION (open): conservative mapping to `Text` (typed text, like `duration` in the core's
+        // `describe/fields.rs`), the form shows a text field; a number/switch field needs a newer frontend.
+        N::Integer | N::Duration | N::Flag | N::Whole => O::Text,
         N::Unknown => O::Unknown,
     }
 }
@@ -107,7 +111,16 @@ fn type_problem(p: new::TypeProblem) -> old::TypeProblem {
     match p {
         N::Empty => O::Empty,
         N::TooLong => O::TooLong,
-        N::Character | N::Contact(_) | N::BadZone | N::BadId | N::BadVersion => O::Character,
+        // `BadNumber`, `BadDuration`, `BadFlag` (v0.0.3): the old code set has no such problem; `Character` is the
+        // unclassified code (QUESTION: own codes need a newer frontend).
+        N::Character
+        | N::Contact(_)
+        | N::BadZone
+        | N::BadId
+        | N::BadVersion
+        | N::BadNumber
+        | N::BadDuration
+        | N::BadFlag => O::Character,
         N::BadLanguage => O::BadLanguage,
         N::BadUri => O::BadUri,
         N::UnsafeScheme => O::UnsafeScheme,
@@ -173,6 +186,22 @@ mod tests {
         assert!(matches!(
             type_problem(new::TypeProblem::OutOfRange),
             old::TypeProblem::NotInList
+        ));
+    }
+
+    #[test]
+    fn new_basic_types_show_as_text() {
+        for b in [
+            new::BasicType::Integer,
+            new::BasicType::Duration,
+            new::BasicType::Flag,
+            new::BasicType::Whole,
+        ] {
+            assert!(matches!(basic(b), old::BasicType::Text));
+        }
+        assert!(matches!(
+            type_problem(new::TypeProblem::BadDuration),
+            old::TypeProblem::Character
         ));
     }
 }
