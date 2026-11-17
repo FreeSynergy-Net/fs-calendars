@@ -14,13 +14,14 @@ use std::sync::{Arc, OnceLock};
 
 use fs_components::blinc::layout::div::div;
 use fs_components_app::commands::{KeyNames, Platform, Resolved, Target, TextKey};
-use fs_components_app::{AppWidget, ModelTexts, Surface, context_trigger};
+use fs_components_app::{AppWidget, ModelTexts, Surface, context_trigger, key_names};
 use fs_components_mf2::Mf2Texts;
 use fs_components_widgets::states::{Alert, EmptyState, Severity};
 use fs_components_widgets::{
     CalendarItem, CalendarNames, CalendarView, Day, Element, Glyph, Moment, Picked, ViewRange,
     styles,
 };
+use fs_components_words::Locale;
 
 use crate::bar::{bar, legend, redraw};
 use crate::context::{KIND, items as context_items, say, words as context_words};
@@ -47,6 +48,7 @@ pub struct Main {
     pub(crate) calendar: Option<&'static str>,
     pub(crate) shared: Shared,
     pub(crate) dot: bool,
+    pub(crate) keys: Arc<KeyNames>,
     pub(crate) shell: Arc<OnceLock<AppWidget>>,
     pub(crate) menu: Arc<Vec<Resolved>>,
     pub(crate) menu_words: Arc<std::collections::HashMap<String, String>>,
@@ -74,6 +76,7 @@ impl Main {
             calendar: None,
             shared: Shared::new(state),
             dot: german(texts),
+            keys: Arc::new(key_names(&locale_of(texts))),
             shell: Arc::new(OnceLock::new()),
             menu: Arc::new(context_items()),
             menu_words: context_words(texts),
@@ -92,6 +95,7 @@ impl Main {
             calendar,
             shared: self.shared.clone(),
             dot: self.dot,
+            keys: Arc::clone(&self.keys),
             shell: Arc::clone(&self.shell),
             menu: Arc::clone(&self.menu),
             menu_words: Arc::clone(&self.menu_words),
@@ -182,6 +186,7 @@ impl Main {
             }
             redraw();
         });
+        let keys = Arc::clone(&self.keys);
         let (shell, menu, menu_words) = (
             Arc::clone(&self.shell),
             Arc::clone(&self.menu),
@@ -204,7 +209,7 @@ impl Main {
                 kind: KIND.to_owned(),
                 ids: chosen.clone(),
             };
-            let (names, words) = (KeyNames::english(), Arc::clone(&menu_words));
+            let (names, words) = (keys.as_ref().clone(), Arc::clone(&menu_words));
             let say = move |key: &TextKey| say(&words, key);
             let texts = ModelTexts {
                 say: &say,
@@ -249,5 +254,14 @@ impl Surface for Main {
             fs_components_fields::controls::STYLES,
             crate::preview::DOT_STYLES
         )
+    }
+}
+
+/// The language of the texts as a locale (the modifier keys of the menu are named in it).
+fn locale_of(texts: &Mf2Texts) -> Locale {
+    if german(texts) {
+        Locale::parse("de").unwrap_or_else(|_| Locale::english())
+    } else {
+        Locale::english()
     }
 }

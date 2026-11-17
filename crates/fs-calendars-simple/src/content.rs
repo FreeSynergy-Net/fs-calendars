@@ -8,7 +8,7 @@ use fs_components_widgets::{Block, Inline, ListItem};
 /// How many entries the lists `start-*` and `coming-*` have; a test checks that every id exists in both languages.
 pub const START: usize = 3;
 /// See [`START`].
-pub const COMING: usize = 7;
+pub const COMING: usize = 8;
 
 fn list(texts: &Mf2Texts, prefix: &str, count: usize) -> Block {
     Block::List {

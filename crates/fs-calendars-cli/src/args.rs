@@ -31,8 +31,8 @@ pub enum Command {
 }
 
 /// The help text.
-pub const HELP: &str = "fs-calendars                    the window (not available until the port)
-fs-calendars app [OPTIONS]     the window (not available until the port)
+pub const HELP: &str = "fs-calendars                    the window (the frontend fs-calendars-simple, next to this program)
+fs-calendars app [OPTIONS]     the window; the options go to fs-calendars-simple (--help there)
 fs-calendars serve [OPTIONS]   the server (--socket, --data, --actor, --instance)
 fs-calendars --version         the version
 fs-calendars [--socket PATH] <command>

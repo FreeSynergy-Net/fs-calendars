@@ -29,7 +29,10 @@ pub enum Mode {
 /// Preview until the server offers the capability [`CAPABILITY`].
 #[must_use]
 pub fn mode(capabilities: &[String]) -> Mode {
-    if capabilities.iter().any(|c| c == CAPABILITY) {
+    if capabilities
+        .iter()
+        .any(|c| c.split_whitespace().next() == Some(CAPABILITY))
+    {
         Mode::Live
     } else {
         Mode::Preview
@@ -152,7 +155,7 @@ pub const ENTRIES: [Entry; 16] = [
     at("work", 7, (9, 0), (10, 0), 13),
     at("private", 12, (19, 0), (21, 0), 14),
     at("work", -3, (15, 0), (16, 0), 15),
-    all_day("holidays", 14, 3, 16),
+    all_day("holidays", 9, 3, 16),
 ];
 
 /// The id of entry `n` (counted from 1): `preview:3`.
@@ -233,6 +236,11 @@ mod tests {
         assert_eq!(mode(&[]), Mode::Preview);
         assert_eq!(mode(&["history".to_owned()]), Mode::Preview);
         assert_eq!(mode(&["appointments".to_owned()]), Mode::Live);
+        assert_eq!(
+            mode(&["files".to_owned(), "appointments 0.1".to_owned()]),
+            Mode::Live
+        );
+        assert_eq!(mode(&["appointmentsx".to_owned()]), Mode::Preview);
     }
 
     #[test]
