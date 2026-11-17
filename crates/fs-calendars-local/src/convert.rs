@@ -53,13 +53,15 @@ pub fn kind(k: si::HistoryKind) -> Kind {
 pub fn kind_back(k: Kind) -> si::HistoryKind {
     match k {
         Kind::Create => si::HistoryKind::Create,
-        Kind::Update => si::HistoryKind::Update,
         Kind::Delete => si::HistoryKind::Delete,
         Kind::Undo => si::HistoryKind::Undo,
         Kind::Invite => si::HistoryKind::Invite,
         Kind::Accept => si::HistoryKind::Accept,
         Kind::TentativeAccept => si::HistoryKind::TentativeAccept,
         Kind::Reject => si::HistoryKind::Reject,
+        // Update, and a kind of the layer the trait does not know (collection kinds of fs-objects v0.0.5: Add, Remove, Join, Leave, Move):
+        // calendars never write them; logged as an update.
+        _ => si::HistoryKind::Update,
     }
 }
 

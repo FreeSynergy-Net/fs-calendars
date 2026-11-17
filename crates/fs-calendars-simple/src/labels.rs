@@ -72,6 +72,6 @@ mod tests {
             Labels::read(&texts, Mode::Preview).calendars.len(),
             CALENDARS.len()
         );
-        assert!(Labels::read(&texts, Mode::Live).calendars.is_empty());
+        assert_eq!(Labels::read(&texts, Mode::Live).calendars.len(), 0);
     }
 }
