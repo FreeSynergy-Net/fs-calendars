@@ -7,7 +7,6 @@
 mod bounded;
 mod counter;
 mod event;
-pub mod lists;
 mod marks;
 mod search;
 mod weight;
