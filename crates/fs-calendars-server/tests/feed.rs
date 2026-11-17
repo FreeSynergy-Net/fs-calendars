@@ -8,7 +8,7 @@ use std::rc::Rc;
 use capnp_rpc::new_client;
 use common::{create, invitations_of, items_of, set_id, with_server};
 use fs_interfaces::common_capnp::{change, change_listener};
-use fs_interfaces::rpc::read_envelope;
+use fs_rpc::read_envelope;
 
 #[derive(Clone, Default)]
 struct Seen(Rc<RefCell<Vec<String>>>);
@@ -156,7 +156,7 @@ async fn a_feed_that_cannot_tell_a_change_ends_and_says_so() {
             let seen = ended.borrow().clone();
             assert_eq!(seen.len(), 1, "{seen:?}");
             assert!(
-                seen[0].starts_with(fs_interfaces::rpc::FEED_ENDED_PROBLEM_TYPE),
+                seen[0].starts_with(fs_rpc::FEED_ENDED_PROBLEM_TYPE),
                 "{seen:?}"
             );
             assert!(seen[0].contains("does not answer"), "{seen:?}");

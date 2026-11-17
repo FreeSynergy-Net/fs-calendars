@@ -4,7 +4,7 @@
 //! is told apart: a task the server calls invalid, because an import loses that task only.
 
 use fs_calendars_core::TasksError;
-use fs_interfaces::rpc::client::problems::{Failure, local_type};
+use fs_rpc::client::problems::{Failure, local_type};
 
 /// What the server said about one task it did not store.
 pub(crate) enum Said {

@@ -4,7 +4,7 @@
 
 use crate::{HELP, parse, run};
 use fs_interfaces::events_capnp::events;
-use fs_interfaces::rpc::{connect, default_socket};
+use fs_rpc::{connect, default_socket};
 
 /// Run the command line `words` (after the program name); the exit code.
 #[must_use]

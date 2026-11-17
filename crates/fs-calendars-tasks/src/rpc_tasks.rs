@@ -10,7 +10,7 @@ use std::path::Path;
 
 use fs_calendars_core::TasksError;
 use fs_interfaces::Capabilities;
-use fs_interfaces::rpc::client::{Fault, Timeouts, Worker};
+use fs_rpc::client::{Fault, Timeouts, Worker};
 
 use crate::remote::Remote;
 

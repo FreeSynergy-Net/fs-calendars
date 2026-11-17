@@ -7,7 +7,7 @@
 use fs_calendars_core::limits::INSTANCE_OVERHEAD_BYTES;
 use fs_calendars_core::{Damaged, Instance, Window};
 use fs_interfaces::events_capnp;
-use fs_interfaces::rpc::{check_answer, to_millis, write_object_id};
+use fs_rpc::{check_answer, to_millis, write_object_id};
 
 use crate::wire::count;
 

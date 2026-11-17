@@ -4,7 +4,7 @@ mod common;
 
 use common::{items_of, set_id, with_server};
 use fs_interfaces::events_capnp::items;
-use fs_interfaces::rpc::{Problem, read_uuid};
+use fs_rpc::{Problem, read_uuid};
 
 const INVALID: &str = "https://freesynergy.net/problems/calendar/invalid";
 

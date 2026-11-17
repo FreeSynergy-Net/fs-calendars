@@ -9,7 +9,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use fs_calendars_core::{TaskIntake, TasksInWindow};
 use fs_calendars_tasks::RpcTasks;
-use fs_interfaces::rpc::{bind_socket, serve};
+use fs_rpc::{bind_socket, serve};
 use fs_tasks_core::TaskRepo;
 use fs_tasks_server::TasksServer;
 

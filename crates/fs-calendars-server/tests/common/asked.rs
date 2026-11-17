@@ -3,7 +3,7 @@
 #![allow(dead_code)] // each test file uses a different subset
 
 use fs_interfaces::events_capnp::items;
-use fs_interfaces::rpc::read_envelope;
+use fs_rpc::read_envelope;
 use uuid::Uuid;
 
 use super::{event_json, ms};
@@ -58,12 +58,12 @@ pub async fn ask_window(items: &items::Client, from: &str, to: &str) -> capnp::R
     let answer = answer.get()?;
     let mut objects = vec![];
     for instance in answer.get_items()? {
-        objects.push(fs_interfaces::rpc::read_uuid(instance.get_object()?).unwrap());
+        objects.push(fs_rpc::read_uuid(instance.get_object()?).unwrap());
     }
     let mut damaged = vec![];
     for d in answer.get_damaged()? {
         damaged.push((
-            fs_interfaces::rpc::read_uuid(d.get_id()?).unwrap(),
+            fs_rpc::read_uuid(d.get_id()?).unwrap(),
             d.get_reason()?.to_string()?,
             d.get_key()?.to_string()?,
         ));

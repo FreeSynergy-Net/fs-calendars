@@ -5,7 +5,7 @@ mod common;
 use std::collections::BTreeSet;
 
 use common::{create, event_json, items_of, json, ms, set_id, with_server};
-use fs_interfaces::rpc::read_envelope;
+use fs_rpc::read_envelope;
 
 #[tokio::test(flavor = "current_thread")]
 async fn an_event_goes_in_and_comes_out_the_same_everywhere() {

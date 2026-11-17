@@ -9,7 +9,7 @@ use std::sync::Arc;
 use fs_calendars_core::Calendar;
 use fs_calendars_core::Revision;
 use fs_interfaces::events_capnp::items;
-use fs_interfaces::rpc::{check_answer, invalid_request, read_object_id, run_to_end};
+use fs_rpc::{check_answer, invalid_request, read_object_id, run_to_end};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use crate::errors::rpc_error;

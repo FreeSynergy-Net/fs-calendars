@@ -5,8 +5,8 @@
 
 use chrono::{DateTime, Utc};
 use fs_calendars_core::{DueTask, ImportReport, TasksError};
-use fs_interfaces::rpc::{read_envelope, read_object_id};
 use fs_interfaces::tasks_capnp::{import_report, items, task};
+use fs_rpc::{read_envelope, read_object_id};
 
 use crate::problems::{Said, error_of, said, unreadable};
 

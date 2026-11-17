@@ -5,8 +5,8 @@
 //! stays as it was. The table is in `DESIGN.md`.
 
 use fs_calendars_core::Error;
-use fs_interfaces::rpc::{Problem, problem_keys as keys};
 use fs_objects::Error as StoreError;
+use fs_rpc::{Problem, problem_keys as keys};
 
 /// `kind` of an event.
 pub(crate) const EVENT: &str = "event";

@@ -3,7 +3,7 @@
 mod common;
 
 use common::{create, event_json, items_of, json, set_id, with_server};
-use fs_interfaces::rpc::Problem;
+use fs_rpc::Problem;
 
 const CONFLICT: &str = "https://freesynergy.net/problems/calendar/conflict";
 

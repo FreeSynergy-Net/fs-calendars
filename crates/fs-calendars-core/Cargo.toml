@@ -11,13 +11,13 @@ rust-version.workspace = true
 contract = ["dep:capnp"]
 
 [dependencies]
-fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
+fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.6" }
 # The contract and the provider rule (ADR 0045).
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.22" }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.27" }
 # The type description (ADR 0066): the same tag as the contract, so the server reports it without a converter.
-fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.22" }
+fs-types = { git = "https://github.com/FreeSynergy/fs-types", tag = "v0.0.1" }
 # Shared JSCalendar types (time, rule, participants, upgrade, validation, iCalendar); Event itself is ours (ADR 0050).
-fs-jscalendar = { git = "https://github.com/FreeSynergy/fs-jscalendar", tag = "v0.0.2" }
+fs-jscalendar = { git = "https://github.com/FreeSynergy/fs-jscalendar", tag = "v0.0.4" }
 rrule = "0.14"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 serde = { version = "1", features = ["derive"] }

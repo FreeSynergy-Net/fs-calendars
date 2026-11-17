@@ -4,7 +4,7 @@
 mod common;
 
 use common::{create, items_of, read_pages, set_id, with_page_size};
-use fs_interfaces::rpc::{INVALID_REQUEST, Problem};
+use fs_rpc::{INVALID_REQUEST, Problem};
 
 const UIDS: usize = 14;
 

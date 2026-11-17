@@ -8,7 +8,7 @@ use std::sync::Arc;
 use fs_calendars_core::Calendar;
 use fs_calendars_core::contract::response_from_wire;
 use fs_interfaces::events_capnp::invitations;
-use fs_interfaces::rpc::{read_object_id, run_to_end};
+use fs_rpc::{read_object_id, run_to_end};
 
 use crate::errors::rpc_error;
 use crate::wire::{optional, required, write_event, write_history};

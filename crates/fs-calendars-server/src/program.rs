@@ -8,8 +8,8 @@ use std::ffi::OsString;
 use std::sync::Arc;
 
 use fs_calendars_core::CalendarRepo;
-use fs_interfaces::rpc::{ServerOptions, prepare_data_dir, run_until_signal};
 use fs_objects::{Store, TursoStore};
+use fs_rpc::{ServerOptions, prepare_data_dir, run_until_signal};
 
 use crate::CalendarServer;
 

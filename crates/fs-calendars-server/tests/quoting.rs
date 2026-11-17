@@ -3,7 +3,7 @@
 mod common;
 
 use common::{create, items_of, with_server};
-use fs_interfaces::rpc::Problem;
+use fs_rpc::Problem;
 
 const MIB: usize = 1024 * 1024;
 const INVALID: &str = "https://freesynergy.net/problems/calendar/invalid";

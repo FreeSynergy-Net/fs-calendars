@@ -117,7 +117,8 @@ pub fn app(
         format!("\u{25A6}  {}", say("screen-all")),
         Arc::new(main.sibling(None)),
     )];
-    for c in CALENDARS {
+    // Only the example calendars of the preview; a real server names its own (this window cannot read them yet).
+    for c in CALENDARS.iter().filter(|_| main.mode() == Mode::Preview) {
         screens.push(Screen::new(
             c.id,
             format!("   {}", say(c.word)),

@@ -4,7 +4,7 @@ mod common;
 
 use common::{items_of, ms, with_server};
 use fs_interfaces::events_capnp::items;
-use fs_interfaces::rpc::{Problem, read_uuid};
+use fs_rpc::{Problem, read_uuid};
 use serde_json::Value;
 
 const SERIES: &str = r#"{"@type":"Event","version":"2.0","uid":"w1","title":"Weekly","start":"2026-11-03T10:00:00","timeZone":"Europe/Berlin","duration":"PT1H","recurrenceRule":{"@type":"RecurrenceRule","frequency":"weekly","count":4},"recurrenceOverrides":{"2026-11-10T10:00:00":{"excluded":true},"2026-11-17T10:00:00":{"title":"Moved","start":"2026-11-17T14:00:00"},"2026-11-02T08:00:00":{"title":"Before the start"}}}"#;
@@ -20,7 +20,7 @@ async fn make(items: &items::Client, text: &str) -> uuid::Uuid {
         .unwrap()
         .get_envelope()
         .unwrap();
-    fs_interfaces::rpc::read_envelope(env).unwrap().id.as_uuid()
+    fs_rpc::read_envelope(env).unwrap().id.as_uuid()
 }
 
 type Row = (i64, i64, bool, String);
@@ -132,7 +132,7 @@ async fn a_window_that_ends_before_it_starts_is_an_invalid_request() {
         let problem = Problem::from_error(&error).unwrap();
         assert_eq!(
             (problem.problem_type.as_str(), problem.status),
-            (fs_interfaces::rpc::INVALID_REQUEST, 422)
+            (fs_rpc::INVALID_REQUEST, 422)
         );
     })
     .await;

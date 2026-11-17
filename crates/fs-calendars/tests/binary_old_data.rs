@@ -7,7 +7,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use fs_interfaces::events_capnp::events;
-use fs_interfaces::rpc::connect;
+use fs_rpc::connect;
 
 fn start(socket: &Path, data: &Path) -> Child {
     Command::new(env!("CARGO_BIN_EXE_fs-calendars"))

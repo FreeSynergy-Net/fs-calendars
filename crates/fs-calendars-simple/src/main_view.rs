@@ -67,12 +67,13 @@ impl Main {
     ) -> Self {
         let mut state = State::new(clock.0, example);
         state.range = range;
+        let mode = mode(capabilities);
         Self {
-            labels: Labels::read(texts),
+            labels: Labels::read(texts, mode),
             names: Arc::new(names(texts)),
             items: Arc::new(items(texts, clock.0)),
             now: clock.1,
-            mode: mode(capabilities),
+            mode,
             calendar: None,
             shared: Shared::new(state),
             dot: german(texts),

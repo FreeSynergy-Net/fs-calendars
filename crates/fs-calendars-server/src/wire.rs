@@ -7,12 +7,12 @@
 use chrono::{DateTime, Utc};
 use fs_calendars_core::model::{Bounds, parse_bounded};
 use fs_calendars_core::{Event, InvitationEntry, Revision};
-use fs_interfaces::rpc::{
+use fs_interfaces::{common_capnp, events_capnp};
+use fs_objects::{ObjectId, StoredObject};
+use fs_rpc::{
     MAX_PAGE_BYTES, check_answer, check_intake, from_millis, read_object_id, to_millis,
     write_envelope,
 };
-use fs_interfaces::{common_capnp, events_capnp};
-use fs_objects::{ObjectId, StoredObject};
 
 use crate::errors::{invalid, invalid_event, invalid_issue, rpc_error};
 

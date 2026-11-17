@@ -11,8 +11,9 @@ use capnp_rpc::new_client;
 use fs_calendars_core::contract::CONTRACT_VERSION;
 use fs_calendars_core::{Calendar, CalendarFeed, Event};
 use fs_interfaces::events_capnp::events;
-use fs_interfaces::rpc::{DEFAULT_PAGE_SIZE, write_uuid};
-use fs_types::{TypeRegistry, describe::CatalogServer};
+use fs_rpc::catalog::CatalogServer;
+use fs_rpc::{DEFAULT_PAGE_SIZE, write_uuid};
+use fs_types::TypeRegistry;
 use tokio::sync::Semaphore;
 
 use crate::feed::subscribe;
@@ -49,7 +50,7 @@ impl CalendarServer {
         self
     }
 
-    /// The capability to hand to `fs_interfaces::rpc::serve`.
+    /// The capability to hand to `fs_rpc::serve`.
     #[must_use]
     pub fn into_client(self) -> events::Client {
         new_client(self)

@@ -8,8 +8,8 @@ use fs_calendars_core::{Calendar, CalendarFeed, CalendarRepo};
 use fs_calendars_server::CalendarServer;
 use fs_interfaces::common_capnp;
 use fs_interfaces::events_capnp::{self, events, invitations, items};
-use fs_interfaces::rpc::{bind_socket, connect, read_envelope, serve, write_uuid};
 use fs_objects::{Store, TursoStore};
+use fs_rpc::{bind_socket, connect, read_envelope, serve, write_uuid};
 use uuid::Uuid;
 
 mod asked;

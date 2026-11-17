@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use fs_calendars_core::{Calendar, CalendarChange, CalendarFeed, CalendarListener};
 use fs_interfaces::common_capnp::{change_listener, subscription};
-use fs_interfaces::rpc::{ChangeSender, Notice, change_channel, forward};
+use fs_rpc::{ChangeSender, Notice, change_channel, forward};
 
 struct ToChannel(ChangeSender<CalendarChange>);
 

@@ -6,8 +6,8 @@ use fs_calendars_cli::{Command, run};
 use fs_calendars_core::CalendarRepo;
 use fs_calendars_server::CalendarServer;
 use fs_interfaces::events_capnp::events;
-use fs_interfaces::rpc::{bind_socket, connect, serve};
 use fs_objects::{Store, TursoStore};
+use fs_rpc::{bind_socket, connect, serve};
 
 async fn with_cli<F, Fut>(test: F)
 where

@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use common::{ME, items_of, with_provider};
 use fs_calendars_core::CalendarRepo;
-use fs_interfaces::rpc::Problem;
 use fs_objects::{Store, TursoStore};
+use fs_rpc::Problem;
 
 fn is(error: &capnp::Error, problem_type: &str, status: u16) {
     let p = Problem::from_error(error).expect("a typed problem");

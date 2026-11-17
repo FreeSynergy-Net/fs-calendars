@@ -12,8 +12,9 @@ local = ["dep:fs-tasks-core"]
 
 [dependencies]
 fs-calendars-core = { path = "../fs-calendars-core" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.22", features = ["rpc"] }
-fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.27" }
+fs-rpc = { git = "https://github.com/FreeSynergy/fs-rpc", tag = "v0.0.2" }
+fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.6" }
 # Tasks belong to fs-tasks (ADR 0050); only with the feature `local`, and never in the core.
 fs-tasks-core = { git = "https://github.com/FreeSynergy/fs-tasks", tag = "v0.0.1", optional = true }
 capnp = "0.27"

@@ -7,7 +7,7 @@ use std::borrow::Cow;
 
 use fs_calendars_core::ImportReport;
 use fs_interfaces::events_capnp;
-use fs_interfaces::rpc::{capped, write_object_id};
+use fs_rpc::{capped, write_object_id};
 
 use crate::wire::{PAGE_BYTES, count};
 

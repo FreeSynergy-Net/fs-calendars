@@ -3,7 +3,7 @@
 mod common;
 
 use common::{ask_window, create_value, items_of, json, ms, with_server};
-use fs_interfaces::rpc::{Problem, TOO_LARGE};
+use fs_rpc::{Problem, TOO_LARGE};
 
 fn is(error: &capnp::Error, problem_type: &str, status: u16) {
     let p = Problem::from_error(error).expect("a typed problem");

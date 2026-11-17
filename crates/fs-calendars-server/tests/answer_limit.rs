@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{ME, ask_window, create_value, items_of, with_provider};
 use fs_calendars_core::{Calendar, CalendarFeed, CalendarRepo, Capabilities, Instance, Result};
-use fs_interfaces::rpc::{Problem, TOO_LARGE};
 use fs_objects::{ObjectId, Store, StoredObject, TursoStore};
+use fs_rpc::{Problem, TOO_LARGE};
 
 /// Answers every window with each instance four times and names no damage and no cut.
 struct Fourfold(Arc<CalendarRepo>);

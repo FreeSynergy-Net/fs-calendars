@@ -5,7 +5,7 @@
 
 /// Largest event: its JSON plus the name in its envelope, as an answer carries both and the title
 /// counts twice. With the rest of the envelope that fits a page of the contract
-/// (`fs_interfaces::rpc::MAX_INTAKE_BYTES`, half of `MAX_PAGE_BYTES`).
+/// (`fs_rpc::MAX_INTAKE_BYTES`, half of `MAX_PAGE_BYTES`).
 pub const MAX_EVENT_BYTES: usize = 16 * 1024 * 1024;
 
 /// Most values (nodes) and most levels of one event; both are checked while the text is read.

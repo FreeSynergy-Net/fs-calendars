@@ -6,7 +6,7 @@
 use crate::facts::with_facts;
 use fs_calendars_core::Error;
 use fs_calendars_core::limits::MAX_EVENT_BYTES;
-use fs_interfaces::rpc::{Problem, TOO_LARGE, failed, problem_keys, unsupported};
+use fs_rpc::{Problem, TOO_LARGE, failed, problem_keys, unsupported};
 
 const NOT_FOUND: &str = "https://freesynergy.net/problems/calendar/not-found";
 const CONFLICT: &str = "https://freesynergy.net/problems/calendar/conflict";

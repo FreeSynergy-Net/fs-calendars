@@ -7,9 +7,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use common::{ME, items_of, with_provider};
 use fs_calendars_core::{Calendar, CalendarRepo, Event, ImportReport, Instance, Result};
-use fs_interfaces::rpc::MAX_PAGE_BYTES;
 use fs_interfaces::{Capabilities, common_capnp};
 use fs_objects::{ObjectId, Store, StoredObject, TursoStore};
+use fs_rpc::MAX_PAGE_BYTES;
 
 const MIB: usize = 1024 * 1024;
 
@@ -82,7 +82,7 @@ async fn a_report_too_large_is_cut_and_keeps_every_created_id() {
 
         let ids = report.get_created().unwrap();
         assert_eq!(ids.len() as usize, created.len(), "created stays whole");
-        let read = |r: common_capnp::uuid::Reader<'_>| fs_interfaces::rpc::read_uuid(r).unwrap();
+        let read = |r: common_capnp::uuid::Reader<'_>| fs_rpc::read_uuid(r).unwrap();
         assert_eq!(read(ids.get(999)), created[999].as_uuid());
 
         let failed = texts(report.get_failed().unwrap());

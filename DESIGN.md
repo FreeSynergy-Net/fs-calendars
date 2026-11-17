@@ -71,14 +71,13 @@ The window of the program is now the frontend `simple` (`crates/fs-calendars-sim
 **What is a preview.** No server speaks the contract for appointments yet (`appointments_v1` is a draft with the provider `fs-calendars-local` in-process; the old Cap'n Proto server serves the old `Event` contract). So the window shows example data (`preview.rs`, the only place; ids `preview:N`, names "Example A/B", never stored, sent or exported) and says so exactly once (an alert "Preview" at the top plus "(Preview)" in the window title); `mode(capabilities)` drops the example as soon as the capability `appointments` is offered, then the empty state shows (the client cannot read appointments yet, said plainly). Every menu entry is locked "coming soon".
 
 **Gaps, honest (placeholder rule: nearest existing component, replaced when the real one exists).**
-* The calendar list on the left is the screen list of the shell: no tick boxes (the colour dot is an emoji character), no "add calendar". Needed: a navigation component with check and colour (Bahn 1).
+* The calendar list on the left is the screen list of the shell: no tick boxes and no colour dot (the list takes text only; the dot is in the legend line under the title), no "add calendar". Needed: a navigation component with check and colour (Bahn 1, v0.0.6). In live mode the list and the legend are empty of example calendars until the window can read the real list.
 * No mini calendar, no week numbers, no "Go to date" (dossier: later).
 * The title line is assembled here from buttons and `segmented`: no overflow of the view buttons in a narrow window (below 420 px the widget itself turns month and week into the agenda). Needed: a view bar component (dossier M7).
 * No create by click or drag, no editor, no series dialog "Only this one / This and all following / All" (card `fs-calendars: Serien-Dialog`), only a first context menu (right click, menu key, Shift+F10 on the calendar: New appointment here, Edit, Delete locked with their reason, Today works; it acts on the whole calendar area, not yet on the appointment or day under the pointer, because `calendar-view` reports no right click on parts: gap for Bahn 1); no title-bar entries from the command model and no keys t/c/d/w/m yet (M2 `set_shortcuts` exists in v0.0.28, not wired here).
 * The week starts on Monday (not set by the person yet); the example is always in the week of today.
 * Times: the window works in a shown zone with plain wall-clock numbers (the widget takes none else); the core keeps UTC with the zone, a date stays a date (all-day items are dates, not instants). Nothing converts yet because no data flows.
-* `fs-components` v0.0.28 takes `fs-types` from the repository fs-types (V1+); the core of this workspace still takes it from `fs-interfaces` v0.0.22, so the lock holds two sources of that name (and `check_lock_sources` strict stays red, as on main for fs-objects, fs-interfaces and fs-jscalendar) until the V1+ lift of the core (fs-types v0.0.1, fs-interfaces v0.0.27, fs-objects v0.0.6, fs-jscalendar v0.0.4). The frontend uses neither type, so nothing crosses.
-* check_lock_sources strict ist rot: vier Bibliotheken mit zwei Quellen (fs-objects, fs-interfaces, fs-jscalendar, fs-types), bis der V1+-Lift des Kerns läuft (nächster Lauf).
+* Lock (V1+ lift): `fs-types` (v0.0.1), `fs-interfaces` (v0.0.27), `fs-objects` (v0.0.6), `fs-jscalendar` (v0.0.4), `fs-rpc` (v0.0.2) and `fs-components` (v0.0.28) come from one source in every crate of the workspace. `check_lock_sources` strict stays red for fs-objects, fs-interfaces and fs-jscalendar because `fs-tasks-core`/`fs-tasks-server` v0.0.1 (feature `local` of `fs-calendars-tasks`, its dev tests) still pull their v0.0.1; fs-tasks has no V1+ tag yet, so green comes with its lift (then only the tag of `fs-tasks-*` moves). The excluded `fs-calendars-app` (history) keeps its own old lock.
 * The colour dot of a calendar stands in a legend line under the title (same status colours as the appointment blocks); the navigation list of the shell takes text only and cannot colour a dot, so dots with tick boxes in the list need a navigation component (Bahn 1, v0.0.6). Later too: mini calendar, larger cell font, narrow week items, dark pictures.
 * No client crate and no server for this window yet, so no handshake and no "hanging instance" test: the starter never waits for a server (it opens the window and ends with its exit code).
 
@@ -162,7 +161,7 @@ keep working. Every file is one concept, <= 200 lines (tests included); `lib.rs`
 
 ## Problem extensions (RFC 9457)
 
-The detail text stays as it was; what a client used to cut out of it is an extension (`coding.md` section 2a). Keys: `id`, `kind`, `issue`, `size`, `limit` of `fs-interfaces::rpc::problem_keys`.
+The detail text stays as it was; what a client used to cut out of it is an extension (`coding.md` section 2a). Keys: `id`, `kind`, `issue`, `size`, `limit` of `fs_rpc::problem_keys`.
 
 | Core error | Problem type | Extensions |
 |---|---|---|
@@ -260,7 +259,7 @@ Still wanted in `fs-objects`:
 * **`privacy` alone does not reach the envelope**: only the marking `freesynergy.net:sensitive` does. `CLASS:PRIVATE` events must stay storable in an unencrypted store. The frontend still treats `private` / `secret` as marked for its own export.
 * **Module heads** use the names of coding.md section 2 as it stands since 2026-11-07 (Specification, Value object, Visitor, Constants are in it now); a test file names what it tests.
 * **`normalise_uid` exists here and in `fs-people-core`** (same rule): it belongs in a shared crate (coding.md section 4), for example `fs-jscalendar`.
-* **`Registry` / `Subscription` exist here and in `fs-tasks-core` and `fs-people-core`**: a generic one belongs in `fs-interfaces::rpc` or `fs-objects`.
+* **`Registry` / `Subscription` exist here and in `fs-tasks-core` and `fs-people-core`**: a generic one belongs in `fs-rpc` or `fs-objects`.
 * **`fs-calendars-server` has no `--tasks-socket`:** tasks in an imported file are noted as "not imported", not stored. `RpcTasks` (`fs-calendars-tasks`) is the client that would attach one (`with_tasks` and `with_task_intake`); the option and its test are not written.
 * **The app holds the task store in its process** (`LocalTasks`) and reads tasks with `fs-tasks-core` types; it should use `RpcTasks` and the JSCalendar text.
 * **`DueTask` is read from the first page to the last**: `RpcTasks::due_between` follows the cursor until it is empty and fails as a whole if one task is too large for a message (`too-large` carries a cursor past it; it is not used). A window with very many tasks is held whole.

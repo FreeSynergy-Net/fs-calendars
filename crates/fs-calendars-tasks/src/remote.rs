@@ -5,8 +5,8 @@
 //! `fs-interfaces`.
 
 use fs_interfaces::Capabilities;
-use fs_interfaces::rpc::client::Remote as Contract;
 use fs_interfaces::tasks_capnp::{items, tasks};
+use fs_rpc::client::Remote as Contract;
 
 /// The capabilities of the server a call may use.
 #[derive(Clone)]

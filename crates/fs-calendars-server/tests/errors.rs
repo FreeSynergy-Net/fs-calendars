@@ -7,9 +7,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use common::{ME, create, invitations_of, items_of, json, set_id, with_provider, with_server};
 use fs_calendars_core::{Calendar, CalendarRepo, Result};
-use fs_interfaces::rpc::{INVALID_REQUEST, Problem};
 use fs_interfaces::{Capabilities, UNSUPPORTED_PROBLEM_TYPE};
 use fs_objects::{Envelope, ObjectId, Store, StoredObject, TursoStore};
+use fs_rpc::{INVALID_REQUEST, Problem};
 
 const INVALID: &str = "https://freesynergy.net/problems/calendar/invalid";
 const CONFLICT: &str = "https://freesynergy.net/problems/calendar/conflict";

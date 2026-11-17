@@ -4,6 +4,8 @@
 
 use fs_components_mf2::Mf2Texts;
 
+use crate::preview::{CALENDARS, Mode};
+
 /// The sentences of the main view.
 #[derive(Clone, Debug)]
 pub struct Labels {
@@ -26,9 +28,10 @@ pub struct Labels {
 }
 
 impl Labels {
-    /// Read the sentences from `texts`.
+    /// Read the sentences from `texts`; the example calendars (the legend) only in preview mode: a real server names its own calendars,
+    /// and this window cannot read them yet, so in live mode there is no legend.
     #[must_use]
-    pub fn read(texts: &Mf2Texts) -> Self {
+    pub fn read(texts: &Mf2Texts, mode: Mode) -> Self {
         let p = |id: &str| texts.plain(id);
         Self {
             previous: p("nav-previous"),
@@ -38,10 +41,11 @@ impl Labels {
             week: p("range-week"),
             day: p("range-day"),
             agenda: p("range-agenda"),
-            calendars: crate::preview::CALENDARS
-                .iter()
-                .map(|c| (c.category, p(c.word)))
-                .collect(),
+            calendars: if mode == Mode::Preview {
+                CALENDARS.iter().map(|c| (c.category, p(c.word))).collect()
+            } else {
+                Vec::new()
+            },
             agenda_from: p("agenda-from"),
             preview_title: p("preview-title"),
             preview_text: p("preview-text"),
@@ -51,5 +55,23 @@ impl Labels {
             empty_title: p("empty-title"),
             empty_text: p("empty-text"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Labels;
+    use crate::preview::{CALENDARS, Mode};
+    use crate::words::words;
+    use fs_components_words::Locale;
+
+    #[test]
+    fn the_legend_names_the_example_calendars_only_in_preview_mode() {
+        let texts = words(&Locale::english());
+        assert_eq!(
+            Labels::read(&texts, Mode::Preview).calendars.len(),
+            CALENDARS.len()
+        );
+        assert!(Labels::read(&texts, Mode::Live).calendars.is_empty());
     }
 }

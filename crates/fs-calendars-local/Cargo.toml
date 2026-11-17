@@ -11,15 +11,15 @@ publish = false
 # The locked trait (folder hash 2b7fc98b..., byte-equal copy under `draft/appointments_v1`) and the zone helpers of the pilot.
 fs-calendars-testdata = { path = "../fs-calendars-testdata" }
 # The raised v5 layer (store, ids, envelope, log, original, purge), pinned to the tagged fs-objects.
-fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.3", features = ["v5"] }
+fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.6", features = ["v5"] }
 # The shared types the layer speaks (same tag as fs-calendars-core).
-fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.22" }
+fs-types = { git = "https://github.com/FreeSynergy/fs-types", tag = "v0.0.1" }
 # The same engine and exact pin as fs-objects (rows are `turso::Value`).
 turso = { version = "=0.8.3", default-features = false }
 tokio = { version = "1", features = ["sync", "time"] }
 async-trait = "0.1"
 # The iCalendar/JSCalendar conversion the pilot already uses (calcard pinned there); same tag as fs-calendars-core.
-fs-jscalendar = { git = "https://github.com/FreeSynergy/fs-jscalendar", tag = "v0.0.2" }
+fs-jscalendar = { git = "https://github.com/FreeSynergy/fs-jscalendar", tag = "v0.0.4" }
 serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 

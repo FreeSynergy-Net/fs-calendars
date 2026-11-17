@@ -5,7 +5,7 @@ mod common;
 use common::{ask_window, create, create_value, event_json, items_of, json, set_id, with_server};
 use fs_calendars_core::limits::MAX_EVENT_BYTES;
 use fs_interfaces::events_capnp::items;
-use fs_interfaces::rpc::{Problem, TOO_LARGE};
+use fs_rpc::{Problem, TOO_LARGE};
 
 const MIB: usize = 1024 * 1024;
 
@@ -113,7 +113,7 @@ async fn events_at_the_limit_come_back_through_list_and_get_and_one_above_is_ref
             .promise
             .await
             .expect("the largest event is accepted");
-        let id = fs_interfaces::rpc::read_envelope(
+        let id = fs_rpc::read_envelope(
             created
                 .get()
                 .unwrap()

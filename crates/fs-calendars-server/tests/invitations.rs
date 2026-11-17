@@ -4,7 +4,7 @@ mod common;
 
 use common::{create, event_json, invitations_of, items_of, set_id, with_server};
 use fs_interfaces::events_capnp::Response;
-use fs_interfaces::rpc::Problem;
+use fs_rpc::Problem;
 
 const CONFLICT: &str = "https://freesynergy.net/problems/calendar/conflict";
 
