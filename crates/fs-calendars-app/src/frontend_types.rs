@@ -30,7 +30,7 @@ fn basic(b: new::BasicType) -> old::BasicType {
         N::Keywords => O::Keywords,
         N::Reference => O::Reference,
         // fs-types v0.0.3 adds integer, duration, flag, whole (types_capnp.rs:28-31); the old frontend (v0.0.2) has no
-        // such field. QUESTION (open): conservative mapping to `Text` (typed text, like `duration` in the core's
+        // such field. TRANSITIONAL until the forms frontend (c0 17./18.11.2026, deliberate): conservative mapping to `Text` (typed text, like `duration` in the core's
         // `describe/fields.rs`), the form shows a text field; a number/switch field needs a newer frontend.
         N::Integer | N::Duration | N::Flag | N::Whole => O::Text,
         N::Unknown => O::Unknown,
@@ -112,7 +112,7 @@ fn type_problem(p: new::TypeProblem) -> old::TypeProblem {
         N::Empty => O::Empty,
         N::TooLong => O::TooLong,
         // `BadNumber`, `BadDuration`, `BadFlag` (v0.0.3): the old code set has no such problem; `Character` is the
-        // unclassified code (QUESTION: own codes need a newer frontend).
+        // unclassified code. TRANSITIONAL until the forms frontend (c0 17./18.11.2026, deliberate): own codes come with it.
         N::Character
         | N::Contact(_)
         | N::BadZone
