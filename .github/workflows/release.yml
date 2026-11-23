@@ -10,7 +10,7 @@ permissions:
   packages: write
 jobs:
   release:
-    uses: FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.15
+    uses: FreeSynergy-Net/fs-release/.github/workflows/release.yml@15935ed0d847d522fcb43d93e340ad1b14809639
     with:
       # `fs-calendars` holds the server (`fs-calendars serve`), the command line and the starter; `fs-calendars-simple` is the frontend process.
       binaries: fs-calendars,fs-calendars-simple
